@@ -1,7 +1,8 @@
 # TB-7304X hardware status
 
 Alpine Linux on kernel 7.0.10 (mt6735-mainline `v7.0.10-mt6735`, 046883c, plus the patches in `device/`) is the tablet's main system; Android + Magisk stay in `recovery` as rollback ([boot chain](../architecture/boot-chain.md)).
-Verified on: kernel `7.0.10-tb7304x+ #18` built 2026-11-17, checked on the tablet 2026-11-23.
+Verified on: build `ae95761` (kernel `7.0.10-tb7304x #ae95761`, rootfs sha256 `9a5f5368…`) in slot B, 2026-11-23;
+slot A still holds the 2026-11-17 build (`#18`) as fallback.
 Future entries name builds by `git describe` from `device/out/BUILDINFO` (shown by `pd state`), not by `#N`.
 
 Research notes: [display](research-display.md), [power/charger/sensors](research-power.md), [power off](research-poweroff.md), [root filesystem](research-rootfs.md), [WiFi/BT](research-wifi.md), [stock LK boot flow](research-lk-bootflow.md), [stock firmware (DTB, boot image, LK)](research-stock-firmware.md).

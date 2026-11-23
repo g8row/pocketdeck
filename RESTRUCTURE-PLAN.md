@@ -1,6 +1,6 @@
 # PocketDeck restructure plan (v2)
 
-Status: **steps 1–6 done** on branch `repo/restructure` (2026-11-23); 7–9 pending. v1 (2026-11-20) was reviewed on 2026-11-23 against the repo
+Status: **steps 1–7 done** on branch `repo/restructure` (2026-11-23); 8 (publish) and 9 (pocketjs) pending. v1 (2026-11-20) was reviewed on 2026-11-23 against the repo
 and the live tablet; this version replaces it. Progress is tracked in §9.
 
 Goal: the project becomes **PocketDeck**, a Linux-first product. The device path is
@@ -162,7 +162,7 @@ Kernel build numbers (`#18`) differ per build machine and were mixed up in the d
 | 4 | Path fixes after the moves, then renames (deskd → deckd, env/config fallbacks, kiosk/mainline prose, service name); update local Claude Code hook paths | – | done; hooks updated; `pocketdeck-ui` deployed and verified on the tablet 2026-11-23 |
 | 5 | `pd`, `.pd.env.example`, slot-B install, build identity | – | done (`pd state`, `pd doctor`, `pd deploy` used against the tablet; build/install not yet run) |
 | 6 | Docs: README, CLAUDE.md, index, install/, architecture/, dev/, compacted status + research; CI (deckd tests, shellcheck, link check, stale-name grep) | – | done; `tools/check-repo.sh` passes, deckd tests pass |
-| 7 | Device verification (§10): build, install to slot B, boot B, deploy, deckd | user OK (writes flash) | |
+| 7 | Device verification (§10): build, install to slot B, boot B, deploy, deckd | user OK (writes flash) | done 2026-11-23: `pd build kernel`/`rootfs` on the build host (`ae95761`), `pd install` → slot B, B healthy in 84 s; rollback A (85 s) and back; Android round trip (normal mode, root) and back; UI + deckd link on B |
 | 8 | Publish: push tag + branches, GitHub rename, `git remote set-url`, merge (no squash), `v0.1.0` | user OK (public) | |
 | 9 | pocketjs work (§7) | separate | |
 
@@ -171,16 +171,16 @@ the kernel/U-Boot objects live in Docker volumes and survive either way).
 
 ## 10. Definition of done
 
-- [ ] `git log --follow` works on a moved file per top-level move
-- [ ] stale-name grep is clean outside `archive/` and `docs/history/`
-- [ ] `bun test` in deckd passes; `pd --help` and every subcommand's `--help` work; `pd doctor` passes
-- [ ] `pd build all` completes (local Docker or `PD_BUILD_HOST`), `uname -v` shows the describe
-- [ ] `pd install kernel rootfs` → slot B; `pd slot b`; reboot; `healthy` with `last_good_slot=b`
-- [ ] `pd deploy`: UI at 60 Hz, `pocketdeck-ui` starts on boot, old `pocketjs` service gone
+- [x] `git log --follow` works on a moved file per top-level move
+- [x] stale-name grep is clean outside `archive/` and `docs/history/`
+- [x] `bun test` in deckd passes; `pd --help` and every subcommand's `--help` work; `pd doctor` passes
+- [x] `pd build all` completes (local Docker or `PD_BUILD_HOST`), `uname -v` shows the describe
+- [x] `pd install kernel rootfs` → slot B; `pd slot b`; reboot; `healthy` with `last_good_slot=b`
+- [x] `pd deploy`: UI at 60 Hz, `pocketdeck-ui` starts on boot, old `pocketjs` service gone
 - [ ] `pd deckd`: connects, a tile action runs on the host, hot reload works; Claude Code hooks reach deckd
-- [ ] Rollback: `pd slot a` boots A again; `pd reboot android` and back
+- [x] Rollback: `pd slot a` boots A again; `pd reboot android` and back
 - [ ] A new reader can follow `docs/install/` 0 → 5 without history docs; all links resolve
-- [ ] No host names, user paths, LAN addresses or keys in the tree (grep in CI)
+- [x] No host names, user paths, LAN addresses or keys in the tree (grep in CI)
 
 ## 11. Risks
 
