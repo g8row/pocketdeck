@@ -42,3 +42,4 @@ device/wcn-tools/wmt_loader
 .pd.env
 CLAUDE.local.md
 .private-patterns
+.worktrees/
