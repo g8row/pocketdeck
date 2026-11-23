@@ -1,11 +1,12 @@
-// desk.config.json — the user-editable layout of the tablet: which panes, in
+// deck.config.json — the user-editable layout of the tablet: which panes, in
 // what order, the deck tiles (label, color, action), the accent and the Claude
-// options. Written by the config UI (ui/), read + watched by deskd, pushed to
+// options. Written by the config UI (ui/), read + watched by deckd, pushed to
 // the tablet as the `layout` and `deck` state. Missing or broken files fall
 // back to the defaults below (built from config.ts), so a fresh checkout works.
 
 import { existsSync, readFileSync, renameSync, watch, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { env } from "./env.ts";
 import { tiles as defaultTiles } from "./config.ts";
 
 export const PANES = {
@@ -67,7 +68,7 @@ export interface Tile {
   action: TileAction;
 }
 
-export interface DeskConfig {
+export interface DeckConfig {
   version: 1;
   panes: PaneId[];
   accent: string; // hex
@@ -86,7 +87,7 @@ export interface DeskConfig {
   focus: { minutes: number };
 }
 
-export function defaultConfig(): DeskConfig {
+export function defaultConfig(): DeckConfig {
   return {
     version: 1,
     panes: ["home", "claude", "pulse", "deck", "music", "board", "focus", "system"],
@@ -131,7 +132,7 @@ function normAction(a: any): TileAction | null {
 
 /** Coerce anything (a hand-edited file, a UI PUT) into a valid config. Throws
  *  only on non-objects; bad fields fall back to defaults field by field. */
-export function normalizeConfig(raw: unknown): DeskConfig {
+export function normalizeConfig(raw: unknown): DeckConfig {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("config must be an object");
   const r = raw as Record<string, any>;
   const d = defaultConfig();
@@ -183,9 +184,20 @@ export function normalizeConfig(raw: unknown): DeskConfig {
   };
 }
 
-export const CONFIG_PATH = process.env.DESKD_CONFIG ?? join(import.meta.dir, "desk.config.json");
+/** deck.config.json next to this file; a desk.config.json from before the rename is taken over once. */
+function defaultConfigPath(): string {
+  const path = join(import.meta.dir, "deck.config.json");
+  const old = join(import.meta.dir, "desk.config.json");
+  if (!existsSync(path) && existsSync(old)) {
+    renameSync(old, path);
+    console.warn("deckd: renamed desk.config.json to deck.config.json");
+  }
+  return path;
+}
 
-export function loadConfig(path = CONFIG_PATH): { config: DeskConfig; error?: string } {
+export const CONFIG_PATH = env("CONFIG") ?? defaultConfigPath();
+
+export function loadConfig(path = CONFIG_PATH): { config: DeckConfig; error?: string } {
   if (!existsSync(path)) return { config: defaultConfig() };
   try {
     return { config: normalizeConfig(JSON.parse(readFileSync(path, "utf8"))) };
@@ -195,7 +207,7 @@ export function loadConfig(path = CONFIG_PATH): { config: DeskConfig; error?: st
 }
 
 /** Atomic write (tmp + rename) so the watcher never reads half a file. */
-export function saveConfig(cfg: DeskConfig, path = CONFIG_PATH): DeskConfig {
+export function saveConfig(cfg: DeckConfig, path = CONFIG_PATH): DeckConfig {
   const norm = normalizeConfig(cfg);
   const tmp = `${path}.tmp`;
   writeFileSync(tmp, JSON.stringify(norm, null, 2) + "\n");
@@ -216,6 +228,6 @@ export function watchConfig(onChange: () => void, path = CONFIG_PATH): void {
 }
 
 /** What the tablet needs to lay itself out. */
-export function layoutState(cfg: DeskConfig) {
+export function layoutState(cfg: DeckConfig) {
   return { panes: cfg.panes, accent: cfg.accent, flash: cfg.claude.flash, approvals: cfg.claude.approvals };
 }

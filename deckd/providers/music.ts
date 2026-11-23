@@ -49,8 +49,8 @@ export async function readMusic(): Promise<MusicState> {
 
 /** Export the current track's artwork as 128×128 RGBA, or null if it has none. */
 export async function readArtwork(size = 128): Promise<Uint8Array | null> {
-  const raw = join(tmpdir(), "deskd-art.bin");
-  const bmp = join(tmpdir(), "deskd-art.bmp");
+  const raw = join(tmpdir(), "deckd-art.bin");
+  const bmp = join(tmpdir(), "deckd-art.bmp");
   const script = `
 tell application "Music"
   if (count of artworks of current track) is 0 then return "none"

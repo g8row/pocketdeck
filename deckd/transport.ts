@@ -1,20 +1,21 @@
-// How the tablet reaches deskd, and how deskd reaches the tablet's shell.
+// How the tablet reaches deckd, and how deckd reaches the tablet's shell.
 //
 //   Android tablet:   adb reverse tcp:7777 tcp:7777            (USB, adbd)
 //   mainline tablet:  ssh -R 7777:127.0.0.1:7777 root@tablet   (USB network, dropbear)
 //
 // Both keepers run every few seconds and are no-ops when their tablet isn't
-// there, so one deskd serves either kind, replugs and reboots included. The
-// tablet's host always dials 127.0.0.1:7777 on its own side, so deskd never
+// there, so one deckd serves either kind, replugs and reboots included. The
+// tablet's host always dials 127.0.0.1:7777 on its own side, so deckd never
 // listens on anything but loopback.
 //
-// Env: DESKD_SSH  ssh target of a mainline tablet (default root@172.16.42.1;
+// Env: DECKD_SSH  ssh target of a mainline tablet (default root@172.16.42.1;
 //                 any ~/.ssh/config alias works; "off" disables the tunnel).
 
 import { $ } from "bun";
 import { deflateSync } from "node:zlib";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { env } from "./env.ts";
 
 type Log = (...a: unknown[]) => void;
 
@@ -37,9 +38,9 @@ export async function keepAdbReverse(port: number, log: Log): Promise<void> {
 
 // ---- ssh (mainline Linux on the tablet) ---------------------------------------------------
 
-const SSH_TARGET = process.env.DESKD_SSH ?? "root@172.16.42.1";
+const SSH_TARGET = env("SSH") ?? "root@172.16.42.1";
 const sshEnabled = SSH_TARGET !== "off" && SSH_TARGET !== "" && !!Bun.which("ssh");
-const CONTROL = join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `deskd-ssh-${process.getuid?.() ?? 0}.sock`);
+const CONTROL = join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `deckd-ssh-${process.getuid?.() ?? 0}.sock`);
 // the tablet is reflashed often: don't pin its host key (same as tools/tb.sh)
 const SSH_OPTS = [
   "-o", "BatchMode=yes",
@@ -132,7 +133,7 @@ export async function keepSshTunnel(port: number, log: Log): Promise<void> {
   tunnel = null;
 }
 
-/** Stop the tunnel (deskd shutting down). */
+/** Stop the tunnel (deckd shutting down). */
 export function closeTransports(): void {
   tunnel?.kill();
 }

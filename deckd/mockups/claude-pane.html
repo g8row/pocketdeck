@@ -5,7 +5,7 @@
 <style>
 /* Layout: option A ("Conversation") as a column of 1024×600 tablet screens, one per session state,
    each with a note on what triggers it and where the data comes from.
-   Single dark theme on purpose: the tablet only runs dark. Tokens mirror deskd/ui/style.css. */
+   Single dark theme on purpose: the tablet only runs dark. Tokens mirror deckd/ui/style.css. */
 :root{
   --ground:#070707;--bg:#0a0a0a;--c1:#141414;--c2:#1d1d1d;--c3:#262626;
   --line:#222;--line2:#363636;--mute:#8a8a8a;--soft:#b3b3b3;--fg:#ededed;--hi:#fff;
@@ -147,7 +147,7 @@ header p{color:var(--soft);max-width:70ch;margin:10px 0 0}
 
 <div class="wrap">
 <header>
-  <div class="eyebrow">deskd · claude pane · option A · 1024×600</div>
+  <div class="eyebrow">deckd · claude pane · option A · 1024×600</div>
   <h1>Conversation layout, state by state</h1>
   <p>Option A shows your last prompt and Claude's last reply in large type, with one side card for whatever the session needs right now. Below are the ten states it has to handle. In each one, scroll the reply with a mouse wheel or trackpad: it is a real scroll area.</p>
   <div class="rules">
@@ -165,7 +165,7 @@ header p{color:var(--soft);max-width:70ch;margin:10px 0 0}
 const NAV = `<div class="nav">${["HOME","CLAUDE","PULSE","DECK","MUSIC","BOARD","FOCUS","SYSTEM"].map(n=>`<span class="${n==="CLAUDE"?"on":""}">${n}</span>`).join("")}</div>`;
 const chip = (name, st, on, extra="") => `<div class="chip ${on?"on":""} ${st==="wait"?"wait":""}"><i class="sq s-${st} ${st==="work"?"live":""}"></i>${name}${extra?` <span class="x">${extra}</span>`:""}</div>`;
 const chips = (sel, over={}) => {
-  const base = {"lenovo-tab":"work","desk-demo":"done","deskd":"idle", ...over};
+  const base = {"lenovo-tab":"work","desk-demo":"done","deckd":"idle", ...over};
   const label = {wait:"needs you"};
   return `<div class="chips">${Object.entries(base).map(([n,s])=>chip(n,s,n===sel,s==="wait"?label.wait:"")).join("")}</div>`;
 };
@@ -184,7 +184,7 @@ const S = [
  screen:()=>`${chips("lenovo-tab")}<div class="grid"><div class="col">${ASK}${reply(LONG)}</div>
   <div class="side"><div class="k"><span>now</span><span>12s</span></div>
    <div class="act">Writing the mockup page<small>Write · claude-pane.html</small></div>
-   <div class="steps"><div>Read  40-claude.png</div><div>Bash  list deskd ui</div><div>Read  claude.ts</div></div>
+   <div class="steps"><div>Read  40-claude.png</div><div>Bash  list deckd ui</div><div>Read  claude.ts</div></div>
    ${ctx(36,"context","359k / 1M")}</div></div>
   <div class="bar"><span class="pill p">open in claude</span><span class="pill">terminal</span><span class="pill">copy reply</span><span class="meta">opus-5-5 · ~/lenovo-tab · 6m</span></div>`,
  note:`<p>The resting state. Last prompt on top, last reply below it in 26px text, current action in the side card.</p>
@@ -250,7 +250,7 @@ const S = [
   <dl><dt>overflow</dt><dd>With more than four options the list scrolls, and the fade shows there are more.</dd></dl>`},
 
 {id:"plan", dot:"wait", title:"Plan ready for approval", tag:"needs you",
- screen:()=>`${chips("deskd",{"deskd":"wait","desk-demo":"done"})}<div class="grid"><div class="col">
+ screen:()=>`${chips("deckd",{"deckd":"wait","desk-demo":"done"})}<div class="grid"><div class="col">
    <div class="qhead"><i class="sq s-wait"></i>plan · port option A</div>
    ${reply(`<h4>Goal</h4><p>Replace the Claude pane with the conversation layout. Keep the nav and the pill buttons.</p>
    <h4>Steps</h4><ol><li>Add <code>prompt</code>, <code>reply</code> and a pending <code>question</code> to the session snapshot in <code>claude.ts</code>.</li><li>Fix <code>contextPct</code>, which reads 100% for 359k on a 1M model.</li><li>Rewrite <code>ClaudePane</code> in <code>views.tsx</code> with chips, a reply scroller and the side card.</li><li>Teach <code>gate.ts</code> to hold <code>AskUserQuestion</code> and return answers.</li><li>Retake <code>shots/41-claude-*.png</code> for every state.</li></ol>
@@ -259,18 +259,18 @@ const S = [
    <div class="act">5 steps · 3 files</div>
    <div class="steps"><div>claude.ts</div><div>views.tsx</div><div>gate.ts</div></div>
    <div class="btns" style="margin-top:auto"><span class="pill">keep planning</span><span class="pill w">approve</span><span class="pill sm ghost wide">approve, auto-accept edits</span></div></div></div>
-  <div class="bar"><span class="pill p">open in claude</span><span class="meta">opus-5-5 · ~/lenovo-tab/deskd</span></div>`,
+  <div class="bar"><span class="pill p">open in claude</span><span class="meta">opus-5-5 · ~/pocketdeck/deckd</span></div>`,
  note:`<p>A plan is long, so it takes the scrollable left column. The side card lists the files it will touch and has the approve buttons.</p>
   <dl><dt>trigger</dt><dd><code>PermissionRequest</code> for <code>ExitPlanMode</code>; the plan text is in <code>tool_input.plan</code></dd>
   <dt>keep planning</dt><dd>Maps to deny, so Claude stays in plan mode.</dd></dl>`},
 
 {id:"done", dot:"done", title:"Finished", tag:"done",
- screen:()=>`${chips("deskd",{"deskd":"done"})}<div class="grid"><div class="col"><div class="ask"><b>you ›</b> rewrite the usage provider to use the API headers</div>${reply(`<p>Usage now reads the <b>5-hour and weekly windows</b> straight from the rate-limit headers, so the bars match <code>/usage</code> exactly.</p><ul><li>Removed the log scraper and its 2-minute poll.</li><li>14 tests pass, 3 of them new.</li><li>Nothing committed yet.</li></ul>`)}</div>
+ screen:()=>`${chips("deckd",{"deckd":"done"})}<div class="grid"><div class="col"><div class="ask"><b>you ›</b> rewrite the usage provider to use the API headers</div>${reply(`<p>Usage now reads the <b>5-hour and weekly windows</b> straight from the rate-limit headers, so the bars match <code>/usage</code> exactly.</p><ul><li>Removed the log scraper and its 2-minute poll.</li><li>14 tests pass, 3 of them new.</li><li>Nothing committed yet.</li></ul>`)}</div>
   <div class="side ok"><div class="k"><span>finished</span><span>4m ago</span></div>
    <div class="act">Took 18 min</div>
    <div class="steps"><div>edited usage.ts</div><div>edited usage.test.ts</div><div>deleted scrape.ts</div></div>
    ${ctx(71,"context","142k / 200k")}</div></div>
-  <div class="bar"><span class="pill p">open in claude</span><span class="pill">copy reply</span><span class="pill">editor</span><span class="meta">sonnet-5-5 · ~/lenovo-tab/deskd</span></div>`,
+  <div class="bar"><span class="pill p">open in claude</span><span class="pill">copy reply</span><span class="pill">editor</span><span class="meta">sonnet-5-5 · ~/pocketdeck/deckd</span></div>`,
  note:`<p>Green card. The reply is the main thing you came to read. The side card says how long the turn took and which files changed, taken from the Edit/Write calls of that turn.</p>
   <dl><dt>trigger</dt><dd><code>Stop</code> hook</dd><dt>fades to idle</dt><dd>After 3 hours (<code>STALE_MS</code>) the chip goes grey.</dd></dl>`},
 
@@ -288,7 +288,7 @@ const S = [
  screen:()=>`<div class="toast">desk-demo asks: allow Bash? <span>view →</span></div>${chips("lenovo-tab",{"desk-demo":"wait"})}<div class="grid"><div class="col">${ASK}${reply(LONG)}</div>
   <div class="side"><div class="k"><span>now</span><span>12s</span></div>
    <div class="act">Writing the mockup page<small>Write · claude-pane.html</small></div>
-   <div class="steps"><div>Read  40-claude.png</div><div>Bash  list deskd ui</div><div>Read  claude.ts</div></div>
+   <div class="steps"><div>Read  40-claude.png</div><div>Bash  list deckd ui</div><div>Read  claude.ts</div></div>
    ${ctx(36,"context","359k / 1M")}</div></div>
   <div class="bar"><span class="pill p">open in claude</span><span class="pill">terminal</span><span class="pill">copy reply</span><span class="meta">opus-5-5 · ~/lenovo-tab · 6m</span></div>`,
  note:`<p>The view doesn't jump to the other session while you're reading. Its chip turns amber and the existing toast drops in. Tap "view →" or the chip to switch.</p>

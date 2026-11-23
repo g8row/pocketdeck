@@ -1,9 +1,9 @@
-// Desk Studio — vanilla JS, no build step. Talks to deskd's /api with the
-// token deskd injected into this page.
-const TOKEN = document.querySelector('meta[name="desk-token"]').content;
+// Deck Studio — vanilla JS, no build step. Talks to deckd's /api with the
+// token deckd injected into this page.
+const TOKEN = document.querySelector('meta[name="deck-token"]').content;
 const $ = (id) => document.getElementById(id);
 const api = async (path, opts = {}) => {
-  const r = await fetch(`/api${path}`, { ...opts, headers: { "x-desk-token": TOKEN, "content-type": "application/json", ...(opts.headers || {}) } });
+  const r = await fetch(`/api${path}`, { ...opts, headers: { "x-deck-token": TOKEN, "content-type": "application/json", ...(opts.headers || {}) } });
   if (!r.ok && r.headers.get("content-type")?.includes("json")) throw new Error((await r.json()).error || r.statusText);
   if (!r.ok) throw new Error(r.statusText);
   return r;
@@ -121,7 +121,7 @@ function boxes(items, pad = 10, gap = 8, railW = 66) {
     it.box = { x, y, w: cx[it.col + it.w - 1] + cw[it.col + it.w - 1] - x, h: ry(it.row + it.h - 1) + rh - y };
   }
 }
-// Live fields (on/sub/level) and the focus clock, from deskd's tablet state.
+// Live fields (on/sub/level) and the focus clock, from deckd's tablet state.
 let live = {};
 async function pullLive() {
   try {
@@ -395,7 +395,7 @@ async function status() {
     $("tabstate").textContent = m.tablet ? `tablet connected${m.via ? ` (${m.via})` : ""}` : "tablet offline";
     $("tabstate").title = m.host || "";
   } catch {
-    $("tabstate").textContent = "deskd unreachable";
+    $("tabstate").textContent = "deckd unreachable";
   }
 }
 setInterval(async () => {

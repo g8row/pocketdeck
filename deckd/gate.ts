@@ -1,5 +1,5 @@
 // Permission gate: Claude Code's PermissionRequest hook (hooks/claude-gate.sh)
-// POSTs to /claude/permission and waits for the response body. deskd holds the
+// POSTs to /claude/permission and waits for the response body. deckd holds the
 // request until the tablet taps allow/deny or the timeout passes. On timeout
 // (or when the gate is off / no tablet is connected) the body is empty, the
 // hook prints nothing, and Claude Code shows its normal prompt — a session is
@@ -107,7 +107,7 @@ export function dropSession(session: string): void {
 export function hookResponse(d: Decision, extra?: Extra): string {
   if (d === "timeout") return "";
   const decision: Record<string, any> =
-    d === "allow" ? { behavior: "allow" } : { behavior: "deny", message: extra?.message ?? "Denied from the desk tablet." };
+    d === "allow" ? { behavior: "allow" } : { behavior: "deny", message: extra?.message ?? "Denied from the tablet." };
   if (d === "allow" && extra?.updatedInput) decision.updatedInput = extra.updatedInput;
   if (d === "allow" && extra?.updatedPermissions?.length) decision.updatedPermissions = extra.updatedPermissions;
   return JSON.stringify({ hookSpecificOutput: { hookEventName: "PermissionRequest", decision } });
@@ -131,7 +131,7 @@ export function tabletDecision(p: Pending, args: any): { d: Decision; extra?: Ex
     return { d: "allow", extra: { updatedInput: { ...p.input, answers } } };
   }
   if (!args?.allow) {
-    const message = p.toolRaw === "ExitPlanMode" ? "Not approved from the desk tablet; keep planning." : undefined;
+    const message = p.toolRaw === "ExitPlanMode" ? "Not approved from the tablet; keep planning." : undefined;
     return { d: "deny", extra: message ? { message } : undefined };
   }
   const extra: Extra = {};

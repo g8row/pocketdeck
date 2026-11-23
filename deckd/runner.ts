@@ -1,11 +1,11 @@
 // Runs a deck tile's action on the host. Cross-platform where it can be:
 // shell/url/app work on macOS, Linux (apps by .desktop entry) and Windows; AppleScript and Shortcuts are
 // macOS-only and report an error elsewhere. Every child gets a timeout and its
-// output is discarded — a tile tap must never wedge deskd.
+// output is discarded — a tile tap must never wedge deckd.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { TileAction } from "./deskconfig.ts";
+import type { TileAction } from "./deckconfig.ts";
 
 export interface Spawned {
   argv: string[];
@@ -31,7 +31,7 @@ export function actionArgv(a: TileAction, platform: string = P): string[] | { er
   }
 }
 
-/** Linux: the .desktop entry for an app named like Desk Studio stores it
+/** Linux: the .desktop entry for an app named like Deck Studio stores it
  *  ("Firefox", "firefox", "org.kde.dolphin"), or null. */
 export function findDesktopEntry(name: string, dirs = appDirs()): string | null {
   const want = name.trim().toLowerCase();

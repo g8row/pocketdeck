@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { mkdtempSync, writeFileSync, appendFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defaultConfig, layoutState, loadConfig, normalizeConfig, saveConfig } from "../deskconfig.ts";
+import { defaultConfig, layoutState, loadConfig, normalizeConfig, saveConfig } from "../deckconfig.ts";
 import { actionArgv, runAction } from "../runner.ts";
 import { __resetSessions, claudeState, onHookEvent, permissionDecided, summarizeTool, toolName, onAlert } from "../providers/claude.ts";
 import { decideById, hold, hookResponse, currentPending, dropSession } from "../gate.ts";
@@ -10,7 +10,7 @@ import { TranscriptTail, parseAssistant } from "../providers/transcript.ts";
 import { __newDay, addEntry, projectName } from "../providers/usage.ts";
 import { focusAction, focusState, focusTick, newFocus } from "../providers/focus.ts";
 
-const tmp = () => mkdtempSync(join(tmpdir(), "deskd-"));
+const tmp = () => mkdtempSync(join(tmpdir(), "deckd-"));
 
 describe("desk config", () => {
   test("defaults mirror config.ts tiles as builtin actions", () => {
@@ -64,7 +64,7 @@ describe("desk config", () => {
     expect(normalizeConfig({ panes: [] }).panes).toEqual(defaultConfig().panes);
   });
   test("save → load round trip; broken file falls back with an error", () => {
-    const p = join(tmp(), "desk.config.json");
+    const p = join(tmp(), "deck.config.json");
     const c = defaultConfig();
     c.accent = "#ABCDEF";
     saveConfig(c, p);

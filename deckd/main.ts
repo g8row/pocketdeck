@@ -1,15 +1,15 @@
-// deskd — the computer half of the TB-7304X desk companion (macOS or Linux;
+// deckd — the computer half of PocketDeck (macOS or Linux;
 // OS-specific bits live in platform/, tablet transports in transport.ts).
 //
-//   tablet (PocketJS host, link.rs) ──TCP 127.0.0.1:7777 over `adb reverse` or `ssh -R`──▶ deskd
-//   Claude Code hooks ──HTTP POST 127.0.0.1:7778/claude──▶ deskd
+//   tablet (PocketJS host, link.rs) ──TCP 127.0.0.1:7777 over `adb reverse` or `ssh -R`──▶ deckd
+//   Claude Code hooks ──HTTP POST 127.0.0.1:7778/claude──▶ deckd
 //
 // Responsibilities: keep the adb tunnel up, push provider state, run tapped
-// actions, and hot-reload the Desk app (rebuild on source change → push the
+// actions, and hot-reload the deck UI (rebuild on source change → push the
 // bundle → the host swaps it in place).
 //
 //   bun main.ts            run (watches apps/desk and rebuilds on change)
-//   DESKD_NO_WATCH=1       don't watch/rebuild; push the existing dist bundle
+//   DECKD_NO_WATCH=1       don't watch/rebuild; push the existing dist bundle
 
 import { $, type Socket } from "bun";
 import { watch } from "node:fs";
@@ -17,7 +17,8 @@ import { join } from "node:path";
 import { actions, builtinInfo, builtinState, readHostState } from "./config.ts";
 import { host } from "./platform/index.ts";
 import { closeTransports, keepAdbReverse, keepSshTunnel, tabletScreenshot, tabletVia } from "./transport.ts";
-import { ACCENTS, COLORS, CONFIG_PATH, ICONS, type Tile, PANES, layoutState, loadConfig, normalizeConfig, saveConfig, watchConfig, type DeskConfig } from "./deskconfig.ts";
+import { ACCENTS, COLORS, CONFIG_PATH, ICONS, type Tile, PANES, layoutState, loadConfig, normalizeConfig, saveConfig, watchConfig, type DeckConfig } from "./deckconfig.ts";
+import { env } from "./env.ts";
 import { runAction } from "./runner.ts";
 import { allPending, currentPending, decideById, dropSession, findPending, holdFull, hookResponse, tabletDecision } from "./gate.ts";
 import { scanUsage, usageState } from "./providers/usage.ts";
@@ -28,15 +29,15 @@ import { cpuPercent, memPercent } from "./providers/sys.ts";
 import { claudeState, getSession, lastMessage, onAlert, onHookEvent, permissionDecided, pollTranscripts } from "./providers/claude.ts";
 import { readTablet } from "./providers/tablet.ts";
 
-const PORT = Number(process.env.DESKD_PORT ?? 7777);
-const HOOK_PORT = Number(process.env.DESKD_HOOK_PORT ?? 7778);
+const PORT = Number(env("PORT") ?? 7777);
+const HOOK_PORT = Number(env("HOOK_PORT") ?? 7778);
 const POCKETJS = process.env.POCKETJS_DIR ?? join(import.meta.dir, "../pocketjs");
 const APP_MANIFEST = "apps/desk/pocket.json";
 const APP_DIR = join(POCKETJS, "apps/desk");
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
-let cfg: DeskConfig = loadConfig().config;
+let cfg: DeckConfig = loadConfig().config;
 let focus: Focus = newFocus(cfg.focus.minutes);
 const UI_TOKEN = crypto.randomUUID();
 const UI_DIR = join(import.meta.dir, "ui");
@@ -172,7 +173,7 @@ const claudeActions: Record<string, (s: { cwd: string; id: string; name: string 
   "claude.focus": (s) => host.focusClaude(s.cwd, s.name),
 };
 
-/** A tile tap: focus.* builtins drive deskd's own timer; the rest run on the Mac. */
+/** A tile tap: focus.* builtins drive deckd's own timer; the rest run on the Mac. */
 async function runTile(t: Tile): Promise<{ ok: boolean; error?: string }> {
   if (t.action.type === "builtin" && t.action.id.startsWith("focus.")) {
     focus = focusAction(focus, t.action.id, undefined, cfg.focus.minutes);
@@ -311,7 +312,7 @@ function pushClaude() {
   setState("claudeTick", { ago, left, held, run });
 }
 
-function applyConfig(next: DeskConfig, why: string) {
+function applyConfig(next: DeckConfig, why: string) {
   cfg = next;
   setState("layout", layoutState(cfg));
   refreshDeck().catch(() => {});
@@ -323,8 +324,8 @@ const allowedHost = (h: string | null) => !!h && /^(127\.0\.0\.1|localhost)(:\d+
 
 let navSeq = 0;
 async function api(req: Request, url: URL): Promise<Response> {
-  // DNS-rebinding + CSRF guard: the token lives only in the page deskd serves.
-  if (req.headers.get("x-desk-token") !== UI_TOKEN) return new Response("forbidden", { status: 403 });
+  // DNS-rebinding + CSRF guard: the token lives only in the page deckd serves.
+  if (req.headers.get("x-deck-token") !== UI_TOKEN) return new Response("forbidden", { status: 403 });
   const path = url.pathname.slice(4);
   if (path === "/config" && req.method === "GET") return Response.json({ config: cfg, path: CONFIG_PATH });
   if (path === "/config" && req.method === "PUT") {
@@ -427,7 +428,7 @@ Bun.serve({
       if (!(await f.exists())) return new Response("not found", { status: 404 });
       const ext = rel.split(".").pop() ?? "";
       if (rel === "index.html") {
-        const html = (await f.text()).replace("__DESK_TOKEN__", UI_TOKEN);
+        const html = (await f.text()).replace("__DECK_TOKEN__", UI_TOKEN);
         return new Response(html, { headers: { "content-type": MIME.html!, "cache-control": "no-store" } });
       }
       return new Response(f, { headers: { "content-type": MIME[ext] ?? "application/octet-stream", "cache-control": "no-store" } });
@@ -480,11 +481,11 @@ onAlert((a) => {
 });
 
 async function main() {
-  bundle = process.env.DESKD_NO_WATCH ? await loadDist() : await build();
+  bundle = env("NO_WATCH") ? await loadDist() : await build();
   for (const c of clients) syncBundle(c); // tablets that connected mid-build
-  if (!process.env.DESKD_NO_WATCH) watchApp();
-  log(`deskd on ${host.name}`);
-  log(`deskd listening on 127.0.0.1:${PORT} (tablet) and :${HOOK_PORT} (hooks, config UI at http://127.0.0.1:${HOOK_PORT}/)`);
+  if (!env("NO_WATCH")) watchApp();
+  log(`deckd on ${host.name}`);
+  log(`deckd listening on 127.0.0.1:${PORT} (tablet) and :${HOOK_PORT} (hooks, config UI at http://127.0.0.1:${HOOK_PORT}/)`);
   const loaded = loadConfig();
   if (loaded.error) log(`config: ${loaded.error} — using defaults`);
   applyConfig(loaded.config, "loaded");
@@ -505,7 +506,7 @@ async function main() {
     const [f, finished] = focusTick(focus);
     focus = f;
     setState("focus", focusState(focus));
-    if (finished) host.notify("Desk focus", "Time is up — take a break.").catch(() => {});
+    if (finished) host.notify("Focus", "Time is up — take a break.").catch(() => {});
   }, 1000);
   setInterval(() => keepAdbReverse(PORT, log).catch(() => {}), 3000);
   setInterval(() => keepSshTunnel(PORT, log).catch(() => {}), 3000);

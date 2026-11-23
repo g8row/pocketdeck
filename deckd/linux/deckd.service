@@ -1,0 +1,20 @@
+# deckd as a systemd user service, started with the graphical session (so it
+# has WAYLAND_DISPLAY / DISPLAY and the session bus for tile actions).
+#   deckd/linux/install.sh        install + start
+#   journalctl --user -u deckd -f
+[Unit]
+Description=deckd: PocketDeck daemon for the TB-7304X tablet
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=@DECKD_DIR@
+ExecStart=@BUN@ main.ts
+Restart=on-failure
+RestartSec=3
+# DECKD_SSH=off to disable the mainline-tablet tunnel; see deckd/README.md for the rest
+Environment=DECKD_SSH=root@172.16.42.1
+
+[Install]
+WantedBy=graphical-session.target

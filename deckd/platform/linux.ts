@@ -88,11 +88,11 @@ async function toggleMute(d: Dev): Promise<void> {
   await first(["amixer", "-q", "sset", d === "sink" ? "Master" : "Capture", "toggle"]);
 }
 
-// ---- caffeine: idle + sleep inhibit held by deskd --------------------------------
+// ---- caffeine: idle + sleep inhibit held by deckd --------------------------------
 
 // The ScreenSaver inhibit (screen dim/lock; KDE, GNOME, Xfce…) lives as long as
 // our bus connection; the logind one (sleep, and idle on desktops that read it)
-// as long as the systemd-inhibit child. Both go away with deskd.
+// as long as the systemd-inhibit child. Both go away with deckd.
 let caffeineBus: Bus | null = null;
 let caffeineProc: ReturnType<typeof Bun.spawn> | null = null;
 const caffeineOn = () => !!caffeineBus?.connected || (!!caffeineProc && caffeineProc.exitCode === null);
@@ -108,15 +108,15 @@ async function caffeineToggle(): Promise<void> {
   try {
     const bus = await Bus.session();
     await bus
-      .call("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver", "org.freedesktop.ScreenSaver", "Inhibit", [{ s: "deskd" }, { s: "Desk tablet: caffeine" }])
+      .call("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver", "org.freedesktop.ScreenSaver", "Inhibit", [{ s: "deckd" }, { s: "PocketDeck: caffeine" }])
       .catch(() =>
         // GNOME without the freedesktop name: inhibit idle (8) + suspend (4)
-        bus.call("org.gnome.SessionManager", "/org/gnome/SessionManager", "org.gnome.SessionManager", "Inhibit", [{ s: "deskd" }, { u: 0 }, { s: "Desk tablet: caffeine" }, { u: 12 }]),
+        bus.call("org.gnome.SessionManager", "/org/gnome/SessionManager", "org.gnome.SessionManager", "Inhibit", [{ s: "deckd" }, { u: 0 }, { s: "PocketDeck: caffeine" }, { u: 12 }]),
       );
     caffeineBus = bus;
   } catch {}
   if (has("systemd-inhibit")) {
-    caffeineProc = Bun.spawn(["systemd-inhibit", "--what=idle:sleep", "--who=deskd", "--why=Desk tablet: caffeine", "--mode=block", "sleep", "infinity"], {
+    caffeineProc = Bun.spawn(["systemd-inhibit", "--what=idle:sleep", "--who=deckd", "--why=PocketDeck: caffeine", "--mode=block", "sleep", "infinity"], {
       stdin: "ignore",
       stdout: "ignore",
       stderr: "ignore",
@@ -128,7 +128,7 @@ const canCaffeine = () => has("systemd-inhibit") || !!process.env.DBUS_SESSION_B
 
 // ---- lock / screen off / screenshot ------------------------------------------------
 
-/** The user's graphical logind session (deskd may run outside it, e.g. as a user service). */
+/** The user's graphical logind session (deckd may run outside it, e.g. as a user service). */
 async function graphicalSession(): Promise<string | null> {
   if (process.env.XDG_SESSION_ID) return process.env.XDG_SESSION_ID;
   const r = await $`loginctl show-user ${process.env.USER ?? String(process.getuid?.())} -p Display --value`.quiet().nothrow();
@@ -248,7 +248,7 @@ function openTerminal(cwd: string, cmd?: string[]): boolean {
   return !!t && launch(terminalArgv(t, cwd, cmd), cwd);
 }
 
-/** Desk Studio stores the macOS app name ("Visual Studio Code"); map it to a command. */
+/** Deck Studio stores the macOS app name ("Visual Studio Code"); map it to a command. */
 export function editorCommand(editor: string): string[] {
   const known: Record<string, string[]> = {
     "visual studio code": ["code"],
@@ -274,10 +274,10 @@ async function openFolder(cwd: string): Promise<void> {
 // ---- notifications, sound, clipboard ---------------------------------------------------
 
 async function notify(title: string, body: string): Promise<void> {
-  if (has("notify-send") && (await $`notify-send -a deskd ${title} ${body}`.quiet().nothrow()).exitCode === 0) return;
+  if (has("notify-send") && (await $`notify-send -a deckd ${title} ${body}`.quiet().nothrow()).exitCode === 0) return;
   await first([
     "gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications", "--object-path", "/org/freedesktop/Notifications",
-    "--method", "org.freedesktop.Notifications.Notify", "deskd", "0", "", title, body, "[]", "{}", "5000",
+    "--method", "org.freedesktop.Notifications.Notify", "deckd", "0", "", title, body, "[]", "{}", "5000",
   ]);
 }
 
@@ -422,7 +422,7 @@ export const linux: Host = {
     screenshot: "screenshot to Desktop / Pictures",
     lock: "lock the screen",
     "display.sleep": "turn the monitors off",
-    "caffeine.toggle": "caffeine on / off (blocks idle + sleep while deskd runs)",
+    "caffeine.toggle": "caffeine on / off (blocks idle + sleep while deckd runs)",
     "music.toggle": "media play / pause (MPRIS)",
     "music.next": "media next track (MPRIS)",
     "music.prev": "media previous track (MPRIS)",

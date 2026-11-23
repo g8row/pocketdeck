@@ -1,4 +1,4 @@
-// The host deskd runs on, picked once at startup. Windows isn't supported yet:
+// The host deckd runs on, picked once at startup. Windows isn't supported yet:
 // it gets the Linux implementation, whose tools are all looked up with
 // Bun.which, so it degrades to no-ops instead of crashing.
 

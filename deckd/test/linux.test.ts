@@ -76,17 +76,17 @@ describe("terminals and editors", () => {
   });
   test("window picking prefers terminals", () => {
     const rows: [string, string][] = [
-      ["1", "deskd — Dolphin"],
-      ["2", "deskd : claude — Konsole"],
+      ["1", "deckd — Dolphin"],
+      ["2", "deckd : claude — Konsole"],
       ["3", "Something else"],
     ];
-    expect(pickWindow(rows, "deskd")).toBe("2");
+    expect(pickWindow(rows, "deckd")).toBe("2");
     expect(pickWindow(rows, "nope")).toBeNull();
   });
 });
 
 test("desktop entries by id or Name", () => {
-  const d = mkdtempSync(join(tmpdir(), "deskd-apps-"));
+  const d = mkdtempSync(join(tmpdir(), "deckd-apps-"));
   const apps = join(d, "applications");
   mkdirSync(apps);
   writeFileSync(join(apps, "org.mozilla.firefox.desktop"), "[Desktop Entry]\nName=Firefox\nExec=firefox %u\n");
@@ -102,13 +102,13 @@ test("desktop entries by id or Name", () => {
 
 describe("dbus wire format", () => {
   test("a method call parses back as a message", () => {
-    const m = methodCall(7, "org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver", "org.freedesktop.ScreenSaver", "Inhibit", [{ s: "deskd" }, { s: "why" }]);
+    const m = methodCall(7, "org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver", "org.freedesktop.ScreenSaver", "Inhibit", [{ s: "deckd" }, { s: "why" }]);
     expect(m[0]).toBe(0x6c);
     expect(m[1]).toBe(1);
     const [msgs, rest] = parseMessages(m);
     expect(msgs).toHaveLength(1);
     expect(rest.length).toBe(0);
-    // body: two strings "deskd", "why"
+    // body: two strings "deckd", "why"
     const dv = new DataView(msgs[0]!.body.buffer, msgs[0]!.body.byteOffset);
     expect(dv.getUint32(0, true)).toBe(5);
   });

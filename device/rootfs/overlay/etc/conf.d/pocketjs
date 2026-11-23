@@ -1,6 +1,6 @@
 # Power key: "ignore" keeps the UI up (the service would restart it anyway); "exit" ends the process.
 POCKETJS_POWER=ignore
-# deskd address; default 127.0.0.1:7777 (ssh -R 7777:127.0.0.1:7777 root@172.16.42.1 from the host).
+# deckd address; default 127.0.0.1:7777 (ssh -R 7777:127.0.0.1:7777 root@172.16.42.1 from the host).
 #POCKETJS_LINK=172.16.42.2:7777
 # The cracked glass reports phantom contacts at fixed spots. Rects in raw panel pixels (portrait 600x1024),
 # "x0,y0,x1,y1;...": a contact that STARTS in one is dropped by the kiosk host for its whole life. Measured

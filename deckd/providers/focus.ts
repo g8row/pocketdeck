@@ -1,4 +1,4 @@
-// Focus timer. Lives in deskd (not the tablet) so it survives hot reloads and
+// Focus timer. Lives in deckd (not the tablet) so it survives hot reloads and
 // can tell the Mac when time is up. Pure state machine + a tick().
 
 export type FocusMode = "idle" | "running" | "paused" | "done";

@@ -1,4 +1,4 @@
-// What the tablet's deck shows and what each tap does. Edit freely: deskd
+// What the tablet's deck shows and what each tap does. Edit freely: deckd
 // pushes the new tiles on restart. Actions run on the host (platform/) as the
 // logged-in user.
 //

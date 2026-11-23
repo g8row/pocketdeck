@@ -1,6 +1,6 @@
 // The tablet's own vitals: battery, free RAM, uptime, CPU clock, Wi-Fi IP.
 // Android (and Android kiosk mode, adbd is native) is read over adb; mainline
-// Alpine over the ssh connection deskd keeps for its tunnel (transport.ts).
+// Alpine over the ssh connection deckd keeps for its tunnel (transport.ts).
 
 import { tabletShell, tabletVia } from "../transport.ts";
 

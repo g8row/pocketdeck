@@ -1,5 +1,5 @@
 // A minimal D-Bus client: just enough to hold a connection open and make method
-// calls with string / uint32 arguments. deskd needs it for one thing busctl and
+// calls with string / uint32 arguments. deckd needs it for one thing busctl and
 // gdbus can't do: inhibitors (org.freedesktop.ScreenSaver.Inhibit and friends)
 // live exactly as long as the caller's bus connection, and those CLIs exit
 // right after the call. Little-endian only, no signals, no introspection.

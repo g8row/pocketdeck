@@ -55,7 +55,7 @@ describe("conversation snapshot", () => {
   });
 
   test("plain() strips markdown but keeps paragraphs and bullets", () => {
-    expect(plain("## Done\n\n**Tests** pass in `deskd`.\n\n- one\n- [two](http://x)\n\n\n\nend")).toBe("Done\n\nTests pass in deskd.\n\n• one\n• two\n\nend");
+    expect(plain("## Done\n\n**Tests** pass in `deckd`.\n\n- one\n- [two](http://x)\n\n\n\nend")).toBe("Done\n\nTests pass in deckd.\n\n• one\n• two\n\nend");
   });
 
   test("AskUserQuestion shows as a question and needs you", () => {
