@@ -21,7 +21,7 @@ id=desk-bootanim
 name=Desk boot animation (Ridge)
 version=1
 versionCode=1
-author=desk-companion
+author=pocketdeck
 description=ASCII ridge boot animation for the TB-7304X desk display. Remove the module to get the stock animation back.
 EOF
 rm -f "$OUT/desk-bootanim.zip"; (cd "$M" && zip -q -r "$OUT/desk-bootanim.zip" .)

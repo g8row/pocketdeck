@@ -38,7 +38,7 @@ pd: PocketDeck command line                                 (docs/index.md, docs
                                      (local Docker, or PD_BUILD_HOST / PD_BUILD_DIR)
   pd ramboot [image]                 RAM-boot via U-Boot fastboot, nothing written
   pd install kernel|rootfs [--slot a|b] [--yes]   default: the slot not running
-  pd slot a|b                        slot U-Boot boots next (resets the attempt counter)
+  pd slot a|b|cache                  slot U-Boot boots next (resets the attempt counter)
   pd boot default linux|android      default OS
   pd reboot linux|android|android-direct|uboot|bootloader
   pd deploy [manifest]               build + install the UI (pocketdeck-ui service)
@@ -151,9 +151,9 @@ install)
 	exec "$T/tb-install.sh" --slot "$slot" $args ;;
 
 slot)
-	s=${1:-}; case $s in a|b) ;; *) die "pd slot a|b" ;; esac
+	s=${1:-}; case $s in a|b|cache) ;; *) die "pd slot a|b|cache" ;; esac
 	if online; then tb "tbstate set slot=$s attempts=0 error=none >/dev/null && tbstate | grep -E '^(slot|attempts|last_good_slot)='"
-	elif adb_up; then adb_tbstate set slot=$s attempts=0 error=none
+	elif adb_up; then adb_tbstate set slot=$s default=linux attempts=0 error=none
 	else die "tablet not reachable"; fi
 	echo "next Linux boot uses slot $s (pd reboot linux)" ;;
 

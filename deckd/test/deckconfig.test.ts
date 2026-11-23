@@ -103,7 +103,7 @@ describe("runner", () => {
 
 describe("claude timeline", () => {
   beforeEach(() => __resetSessions());
-  const base = { session_id: "s1", cwd: "/Users/me/proj" };
+  const base = { session_id: "s1", cwd: "/work/proj" };
 
   test("tool summaries", () => {
     expect(summarizeTool("Bash", { command: "ls -la", description: "List files" })).toBe("List files");

@@ -1,4 +1,6 @@
-# TB-7304X (MT6737M) mainline display: research findings
+# TB-7304X (MT6737M) display: research findings
+
+Status: current (bring-up notes; the live state is in [status.md](status.md))
 
 Date: 2026-11-16. Read-only research. Nothing on the tablet, USB, fastboot or network was touched, and no repo files were edited.
 
@@ -405,6 +407,8 @@ Notes on the snippet:
 
 ## 4. Code that is missing
 
+Done: items 1 and 2 (panel driver, D2 mutex data) and the hand-over; see [status.md](status.md).
+
 1. **Panel driver** `drivers/gpu/drm/panel/panel-novatek-nt51021b.c`:
    - prepare: regulator on, 20 ms, reset dance, command table
    - unprepare: suspend table, reset low, regulator off
@@ -420,32 +424,10 @@ Notes on the snippet:
 
 ## 5. Ordered bring-up plan
 
-**Step 0: capture LK state, read-only.** Use devmem under the current simpledrm boot, with the display running from LK.
-- `lcmname` in `/proc/device-tree/chosen/atag,videolfb` (DJ vs GX), and the GPIO125 level.
-- MUTEX0_MOD `0x1401502c` and SOF `0x14015030`.
-  - If the mod bits are the D2 values (e.g. RDMA0 = bit 8 and DITHER = bit 15 set), the D2 table is confirmed.
-  - The D1 pattern would be bits 7 and 14.
-- MM_CG_CON0/1 `0x14000100`/`0x14000110` and MMSYS routing registers `0x14000030/38/58/64/6c`.
-  - An optional definitive CG test: write one bit to CG_SET `0x14000104` and back via CG_CLR `0x14000108` (bit 11 vs 12) and watch whether the image freezes.
-- DSI0 `0x14012000` registers: MODE_CTRL +0x14, TXRX_CTRL +0x18 (lane count), VSA/VBP/VFP +0x20.., HSA/HBP/HFP +0x50... These cross-check the decoded timings and DJ/GX.
-- MIPI_TX `0x14018000` PLL registers.
-- DISP_PWM `0x1100e000` +0x00/+0x10/+0x14 (period), and GPIO69 mux.
-- larb0 MMU_EN `0x14016fc0` (expected 0, meaning LK uses physical addressing).
-
-**Step 1: DT address/IRQ/larb fixes only, with display nodes still disabled.**
-- Expect smi_larb0/common and M4U to probe (no "mm dts parse fail").
-- Keep `mtk-lk-fb`. Check that the LK image survives the SMI/M4U probe: larb `config_port` with real addresses should now hit larb0, not MUTEX.
-
-**Step 2: D2 mutex data + panel driver + RDMA0 -> DSI0 graph.**
-- Boot with `lkfb.enable=0 clk_ignore_unused pd_ignore_unused`.
-- First get `modetest`, or fbcon on the mediatek-drm fbdev, to show the image.
-- Use the DJ/GX mode matching step 0.
-
-**Step 3: backlight** (`pwm-backlight` on `disp_pwm`), then **suspend/resume** (DSI off/on, panel re-init).
-
-**Step 4: full OVL0 path.** Optionally add OVL0 -> COLOR -> (CCORR/AAL/GAMMA) -> DITHER -> RDMA0 -> DSI0 for multi-plane support. This needs CCORR/AAL/GAMMA nodes or bypass handling, and their clocks.
-
-**Step 5: drop `clk_ignore_unused` and the 0002 smi patch** once IOMMU and larb links are correct.
+Done: step 0 (LK state captured, see the appendix), D2 DT/IRQ/larb fixes, D2 mutex data, NT51021B GX panel driver,
+RDMA0 → DSI0 through the IOMMU, backlight; see [status.md](status.md). Open: suspend/resume (DSI off/on, panel
+re-init), the full OVL0 → COLOR → (CCORR/AAL/GAMMA) → DITHER → RDMA0 → DSI0 path for hardware planes, and dropping
+`clk_ignore_unused` and the 0002 smi patch.
 
 ### Risks
 - **D2 clock-gate/reset bit layout is unverified.** A wrong DSI or RDMA gate means a dead or frozen pipe. Do step 0 first.
@@ -482,3 +464,16 @@ Stock DTB:
 - `led@6` mode 5
 
 D1 reference: Wiko U FEEL stock DTB in https://gitlab.postmarketos.org/postmarketOS/pmaports/-/commit/136ef57fd5d6dd2156fcd8215dab5e5a46b9c4fd.patch
+
+## Appendix: LK display state (read 2026-11-16)
+Read with devmem from Alpine while LK's picture was up. Confirms the findings above:
+- `lcmname` = `nt51021b_dsi_vdo_gx`, so this tablet has the **GX** panel variant.
+- MUTEX0_MOD `0x14015030` → mod `0x2F940` (bits 6 OVL0, 8 RDMA0, 11 CCORR, 12 COLOR, 13 AAL, 14 GAMMA, 15 DITHER,
+  17 PWM) and SOF = 1 (DSI0). This confirms the **D2 mutex table** and that LK runs the full OVL0→…→RDMA0→DSI0 path.
+- DSI0: MODE_CTRL = 3 (burst video), TXRX_CTRL = 0x3C (4 lanes), VSA/VBP/VFP = 2/25/35, VACT = 1024,
+  HSA/HBP/HFP word counts = 36/284/244. These are the GX timings.
+- MMSYS CG_CON0/1 = `0xFFFCB3FC`/`0xFFFFFFF0`.
+- MIPI_TX PLL: `0x14018058` = `0x33B13B13`, `+0x50` = 9, `+0x54` = 1.
+- larb0 MMU_EN (`0x14016fc0`) = 0: LK scans out with physical addresses.
+- DISP_PWM `0x1100e000` EN = 1, `+0x14` = `0x03FF03FF`.
+- The GPIO125 level could not be read (it isn't requested in debugfs); `lcmname` makes it unnecessary.

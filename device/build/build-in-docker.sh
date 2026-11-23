@@ -1,12 +1,12 @@
 #!/bin/bash
 # Runs inside the tb7304-build container (debian trixie arm64, native gcc).
-#   /m      = lenovo-tab/mainline (bind mount)
+#   /m      = device/ (bind mount)
 #   /kout   = kernel build dir (docker volume tb7304-kbuild)
-#   /stock  = lenovo-tab/backup/partitions (read-only)
+#   /stock  = backup/partitions (read-only)
 set -euo pipefail
 M=/m; K=$M/src/linux; O=/kout; OUT=$M/out; mkdir -p $OUT /build
 JOBS=$(nproc)
-# Native on an arm64 host (Mac), cross on x86_64 (taos): CROSS/BUSYBOX come from the Dockerfile.
+# Native on an arm64 host, cross on x86_64: CROSS/BUSYBOX come from the Dockerfile.
 if [ "$(uname -m)" != aarch64 ]; then export CROSS_COMPILE=aarch64-linux-gnu-; fi
 CC=${CROSS_COMPILE:-}gcc; STRIP=${CROSS_COMPILE:-}strip; BUSYBOX=${BUSYBOX:-${BUSYBOX_ARM64:-/bin/busybox}}; [ -x "$BUSYBOX" ] || BUSYBOX=/bin/busybox
 CMDLINE_BASE="bootopt=64S3,32N2,64N2"
@@ -43,7 +43,7 @@ $STRIP $R/bin/lkpaint
 # boot record tool (format shared with U-Boot: u-boot/tbstate.h). Also copied to out/ for Android (adb push).
 $CC -static -O2 -Wall -Wextra -I $M/u-boot -o $R/bin/tbstate $M/initramfs/tbstate.c
 $STRIP $R/bin/tbstate; cp $R/bin/tbstate $OUT/tbstate
-# boot menu (plan-dualboot.md §5). Font: Terminus 16x32 from the kernel tree, converted here (GPL, not committed)
+# boot menu (boot-chain.md, "Stage-1 boot menu"). Font: Terminus 16x32 from the kernel tree, converted here (GPL, not committed)
 python3 - $M/src/linux/lib/fonts/font_ter16x32.c /build/font.h <<'PY'
 import re, sys
 t = open(sys.argv[1]).read(); i = t.index("FONTDATAMAX, 0 }, {"); j = t.index("} };", i)

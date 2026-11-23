@@ -1,18 +1,8 @@
-# TB-7304X mainline: a root filesystem on the eMMC (research, 2026-11-16)
+# TB-7304X: a root filesystem on the eMMC (research, 2026-11-16)
 
-Research only. Nothing was run on the tablet and no repo file was changed. I read the build host (taos) only to check
-for Docker and binfmt.
-
-> **Current status (2026-11-19):** this is the 2026-11-16 research note. The RTC, charger, AUXADC and thermal
-> drivers described as missing below are implemented; see [STATUS.md](STATUS.md). The live root is on `tbroot_a`.
-
-> **Long-term layout decided 2026-11-17** in [plan-dualboot.md](plan-dualboot.md):
-> - No microSD.
-> - `userdata` shrinks to 3 GiB. Android's data is wiped once, and its stock recovery re-formats it so Android can
->   re-encrypt.
-> - The freed space holds `tbstate`, raw kernel slots A/B/rescue, ext4 roots A/B and `tbdata`.
->
-> The cache loop image below stays the interim root until the migration in plan-dualboot §6.
+Status: current (bring-up notes; the live state is in [status.md](status.md)). This note recommended an interim
+loop image on `cache`; the decided layout is the ext4 slots `tbroot_a`/`tbroot_b` plus `tbdata` from the repartitioned
+`userdata` ([boot-chain.md](../architecture/boot-chain.md) §2). Research only: nothing was run on the tablet.
 
 ## TL;DR recommendation
 
@@ -28,7 +18,7 @@ for Docker and binfmt.
   loop-mounts the image and `switch_root`s. If anything fails, it falls back to today's initramfs shell. A boot
   counter on cache protects against boot loops.
 - **How to write it:** copy one file into `/cache/linux/` **from rooted Android** (adb push + `su cp`). The fallback is
-  `nc` from the mainline initramfs. Neither writes a raw partition. `fastboot flash cache` is possible
+  `nc` from the Linux initramfs. Neither writes a raw partition. `fastboot flash cache` is possible
   (max-download 128 MiB, sparse supported), but it replaces Android's cache filesystem, so it is not needed.
 
 ## 1. Partition layout
@@ -40,11 +30,11 @@ for Docker and binfmt.
   (`md1img`…, `scp1/2`, `odmdtbo`) that LK knows about. There is no `vendor` mount in fstab and no A/B slots, so
   there is **no second `system` slot**.
 - Known sizes (from the backups): boot 16 MiB, recovery 16 MiB, lk 512 KiB, logo 8 MiB.
-- The full GPT/size table is **not in the repo**. The mtkclient dump on the Mac (~4.6 GB, which suggests it excludes
+- The full GPT/size table is **not in the repo**. The mtkclient dump on the host (~4.6 GB, which suggests it excludes
   userdata) would have it.
 - Typical MT6737 Android 7 16 GB layout (unverified): system ~2.5–3 GB, **cache ~256–450 MB**, userdata ~11–12 GB.
 - Read-only ways to get the real table (pick one):
-  - mainline initramfs:
+  - Linux initramfs:
     `mlsh.py 'for d in /sys/class/block/mmcblk0p*; do (. $d/uevent; echo $DEVNAME $PARTNAME $(($(cat $d/size)/2048))MiB); done'`
   - LK fastboot: `fb_send.py - getvar:partition-size:cache` (LK registers `partition-size:%s` and `partition-type:%s`)
   - Android:
@@ -195,71 +185,10 @@ try_rootfs() {
 
 ## 4. Build and write
 
-### Build on taos (x86_64, Docker; checked: no qemu binfmt registered, only llvm-19/python3.13)
-**A. Cross, no qemu (no host change).** apk installs foreign-arch packages, but maintainer scripts can't run.
-```sh
-mkdir -p ~/tb7304-rootfs/out && cd ~/tb7304-rootfs
-docker run --rm -v $PWD/out:/out alpine:3.24 sh -euxc '
-  apk add --no-cache e2fsprogs
-  R=/tmp/r; mkdir -p $R; V=3.24.4
-  wget -q https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/aarch64/alpine-minirootfs-$V-aarch64.tar.gz
-  echo "4b14c18f7e90a063b61462ea1462a5732c154bf6adad594974fe6487cd98a8de  alpine-minirootfs-$V-aarch64.tar.gz" | sha256sum -c
-  tar xzf alpine-minirootfs-$V-aarch64.tar.gz -C $R
-  # repositories + aarch64 signing keys come from the minirootfs itself
-  apk --root $R --arch aarch64 --no-scripts --no-cache add alpine-base dropbear e2fsprogs nano htop
-  # --no-scripts: do what the scripts would have done
-  for s in devfs dmesg mdev; do ln -sf /etc/init.d/$s $R/etc/runlevels/sysinit/; done
-  for s in hostname bootmisc sysctl networking urandom; do ln -sf /etc/init.d/$s $R/etc/runlevels/boot/; done
-  for s in dropbear local; do ln -sf /etc/init.d/$s $R/etc/runlevels/default/; done
-  # + copy inittab, interfaces, fstab, hostname, authorized_keys, local.d script (section 3)
-  truncate -s 256M /out/rootfs.img
-  mkfs.ext4 -q -L tbroot -O ^metadata_csum_seed -d $R /out/rootfs.img
-  sha256sum /out/rootfs.img > /out/rootfs.img.sha256'
-```
-- Dropbear is suggested over openssh on path A. The openssh-server pre-install script creates the `sshd`
-  privilege-separation user. Without scripts, add it by hand: append `sshd:x:22:22:…` lines to
-  `passwd`/`group`/`shadow`.
-- Busybox applet links already exist in the minirootfs.
-- Later, on the device: `apk fix` with the proxy re-runs the scripts.
-
-**B. qemu-user (most robust; needs your OK because it changes taos's kernel binfmt table until reboot).**
-```sh
-docker run --privileged --rm tonistiigi/binfmt --install arm64
-docker run --rm --platform linux/arm64 -v $PWD/out:/out alpine:3.24 sh -c 'apk add alpine-base openssh …'   # scripts run normally
-```
-Build the rootfs dir inside the arm64 container, then `mkfs.ext4 -d` as above.
-
-Optional stage-1 additions:
-- `e2fsck` for the image: Debian `e2fsck-static:arm64`, fetched with `apt-get download` in our Dockerfile the same
-  way busybox-static is.
-- The initramfs is currently included **twice**: in `CONFIG_INITRAMFS_SOURCE` and as the boot.img ramdisk. Drop one
-  to free space under 16 MiB.
-
-### Write to the tablet (in order of preference)
-1. **Rooted Android (no fastboot, no raw partition writes).**
-   ```sh
-   adb shell su -c 'df -h /cache'                     # need > image size free
-   adb push out/rootfs.img /data/local/tmp/rootfs.img
-   adb shell su -c 'mkdir -p /cache/linux && cp /data/local/tmp/rootfs.img /cache/linux/rootfs.img.new && sync &&
-     mv /cache/linux/rootfs.img.new /cache/linux/rootfs.img && echo 0 > /cache/linux/bootcount && sha256sum /cache/linux/rootfs.img &&
-     rm /data/local/tmp/rootfs.img'
-   ```
-   Compare the hash with `rootfs.img.sha256`. Then reboot to fastboot, flash the new stage-1 image to `recovery`
-   with `fb_send.py`, and run `oem reboot-recovery`, as today.
-2. **From the mainline initramfs.** Mount cache rw, then on the tablet run
-   `nc -l -p 5000 > /mnt/cache/linux/rootfs.img; sync`, and on the host `nc -q1 172.16.42.1 5000 < out/rootfs.img`.
-   Check sha256 on both ends. This breaks the "eMMC read-only" convention deliberately and only inside cache.
-3. **LK fastboot `flash:cache`.**
-   - Only for a whole-filesystem image; not recommended.
-   - Facts from `lk.bin`:
-     - `max-download-size` = **`0x8000000` (128 MiB)**: the literal is loaded at 0x41e20f44, next to the
-       `download:` registration.
-     - Sparse images are supported (`cmd_flash_mmc_sparse_img`, "sparse image header invalid", and so on).
-   - `fb_send.py` sends one download, so the sparse image must be ≤128 MiB. Make it with `img2simg`
-     (`android-sdk-libsparse-utils`). Otherwise split it, which needs a multi-part sparse sender.
-   - The fs must be exactly the partition size (`getvar:partition-size:cache`) and use features Android 7's old
-     e2fsck accepts: `mkfs.ext4 -O ^metadata_csum,^64bit,^orphan_file,^metadata_csum_seed`.
-   - It wipes Android's cache contents.
+Done: the root is built by `device/rootfs/build-rootfs.sh` (cross, apk `--no-scripts`, as path A here proposed) and
+written to `tbroot_a`/`tbroot_b` by `pd install rootfs`; see [status.md](status.md). LK facts kept from this
+section: fastboot `max-download-size` = **0x8000000 (128 MiB)** (literal at 0x41e20f44, next to the `download:`
+registration), and LK accepts sparse images (`cmd_flash_mmc_sparse_img`).
 
 ### Risks
 - **Never write `userdata`, `system`, `metadata`, `nvram`/`nvdata`/`protect*` (IMEI/calibration), `para`
@@ -279,7 +208,7 @@ Optional stage-1 additions:
   busybox-static has both).
 
 ## Sources
-- Repo: `device/README.md`, `TEST-PLAN.md`, `initramfs/init`, `device/build/build-in-docker.sh`, `patches/config-tb7304x.fragment`,
+- Repo: the bring-up README and test plan (retired), `initramfs/init`, `device/build/build-in-docker.sh`, `patches/config-tb7304x.fragment`,
   `out/build5/kernel.config`, `device/analysis/fb_send.py`, `backup/partitions/{boot,recovery,lk}.bin` (fstab, init.rc, LK disassembly).
 - Alpine latest-stable aarch64: https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/aarch64/latest-releases.yaml
 - pmOS → Nura rename: https://linuxiac.com/postmarketos-is-now-nura-after-major-project-rebrand/ ,

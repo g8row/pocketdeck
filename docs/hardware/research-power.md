@@ -1,8 +1,8 @@
-# TB-7304X mainline: charger, battery, RTC, thermal, sensors (research notes)
+# TB-7304X: charger, battery, RTC, thermal, sensors (research notes)
 
-> **Current status (2026-11-19):** the charger, RTC, AUXADC, thermal zones and accelerometer described here are
-> implemented; see [STATUS.md](STATUS.md). The text below is the original research/plan, with the charger
-> implementation note in §1.
+Status: current (bring-up notes; the live state is in [status.md](status.md)). The charger, RTC, AUXADC, thermal
+zones and accelerometer described here are implemented; the text is the original research, with implementation notes
+in §1, §4 and §5.
 
 Sources used:
 - `device/stock/stock.dts` (stock 3.18 DTB, decompiled).
@@ -11,8 +11,7 @@ Sources used:
   `drivers/misc/mediatek/power/mt6735/charging_hw_sm5414.c`, `battery_meter_hal.c`, `pmic_chr_type_det.c`,
   `rtc/mtk_rtc_hal_common.c`, `accelerometer/accel.c`, `cap_sensor/sx9310/sx9310.c`, `thermal/mt6735/src/mtk_tc_D2.c` ...
 - `backup/partitions/lk.bin` strings.
-- Kernel tree. `/m/src/linux` no longer exists on taos: the `tb7304-kbuild` volume only holds the O= build dir, and
-  its `source` symlink points to the missing `/m/src/linux`. I made a sparse clone of
+- Kernel tree: the build host's `tb7304-kbuild` volume only holds the O= build dir. I made a sparse clone of
   `gitlab.com/mt6735-mainline/linux` branch `mt6735-stable-7.0.y` (HEAD 046883c) in `scratchpad/linux`.
   I read the build's `.config` from the volume.
 - Downstream MTK 3.18 MT6735 reference code: github `dhirajms/kernel_lenovo_P1m_3.18.y`, and the SM5414 driver from
@@ -48,7 +47,7 @@ Relevant options in the current `.config`:
 
 ## 1. Charger: SM5414 on I2C3 @0x49
 
-**Implemented 2026-11-17** (`device/patches/sm5414_charger.c`, STATUS.md). Measured on the device, differing from
+**Implemented 2026-11-17** (`device/patches/sm5414_charger.c`, status.md). Measured on the device, differing from
 the plan below:
 - LK leaves VBUSLIMIT at 450 mA. That is about what the running tablet draws, so the battery got ~0 mA (fuel gauge)
   while STATUS said TOPOFF. The driver sets 1 A; the battery then takes the full 440-500 mA.
@@ -148,7 +147,7 @@ the map above), so nothing needs to be kicked.
   and in the worst case swelling. It is not a short-term hazard.
 - If the fast-charge timer expires (INT2 FASTTMROFF), charging stops until nCHGEN is toggled or VBUS is replugged.
   The battery then slowly discharges while the system runs from VBUS through the IC's power path. That is harmless.
-- So: the battery charges today under mainline (until the timer expires), but with no temperature monitoring and
+- So: the battery charges under Linux without a driver (until the timer expires), but with no temperature monitoring and
   at the stock 4.35 V.
 - **Unverified:** the actual register values LK leaves. Read them (see the order below, step 1) before trusting any
   of this. On stock Android, `cat /sys/.../sm5414_access` dumps the registers.
@@ -408,7 +407,7 @@ add `"mediatek,mt6328-rtc"` to the driver's match table later, for upstreaming.
 ## 4. Thermal
 
 > **Implemented 2026-11-16, verified 2026-11-17:** `patches/0009` adds the SoC thermal zone and the battery NTC zone; `thermal_zone0`
-> (`cpu-thermal`) reports live values and drives cpufreq at the passive trip (STATUS.md).
+> (`cpu-thermal`) reports live values and drives cpufreq at the passive trip (status.md).
 
 ### SoC (THERM_CTRL 0x1100b000, irq SPI 78)
 - Mainline `drivers/thermal/mediatek/auxadc_thermal.c` (CONFIG_MTK_THERMAL, already `=y`) has mt8173, mt2701,
@@ -447,14 +446,14 @@ add `"mediatek,mt6328-rtc"` to the driver's match table later, for upstreaming.
   - Downstream defaults are pull-up 39 kΩ to 1.8 V, 100 kΩ NTC (NCP15WF104), but these are tunable. **Board values
     unverified.**
   - Needs only `mt6577_auxadc` + `ntc_thermistor` (`murata,ncp15wf104`).
-  - Effort half a day. Gives a "skin" temperature for deskd.
+  - Effort half a day. Gives a "skin" temperature for deckd.
 
 ---------------------------------------------------------------------------------------------------------------
 
 ## 5. Accelerometer (optional)
 
 > **Implemented 2026-11-17:** the fitted part is the **BMA255 @0x18** (chip ID 0xFA), driven by bmc150-accel; the
-> MC3433 @0x4c is not fitted. See the device table in STATUS.md.
+> MC3433 @0x4c is not fitted. See the device table in status.md.
 
 - Primary part: MC3433 @0x4c on i2c2 (stock `cust_accel@0`). Second-source: BMA2xx @0x18. Both drivers were built
   into stock, and one probes.
@@ -484,33 +483,30 @@ add `"mediatek,mt6328-rtc"` to the driver's match table later, for upstreaming.
 
 ## Recommended order
 
-> **Done:** steps 1–4 and the accelerometer were implemented on 2026-11-17 (STATUS.md). The list is kept as the
-> original plan.
-
-1. **Read-only probe**: zero new code, about 30 min, no risk.
-   - Add `&i2c3 { status = "okay"; clock-frequency = <100000>; };` and `&i2c2 { status = "okay"; };` with no
-     children. `I2C_CHARDEV` is already `=y`; busybox needs the `i2c*` applets.
-   - Dump the SM5414: `i2cdump -y -r 0-14 3 0x49 b`. This shows what LK left: BATREG, FASTCHG, VBUSLIMIT, FASTTIMER,
-     AUTOSTOP.
-   - Read the accelerometer IDs on bus 2.
-   - Check GPIO124/63 levels in debugfs `pinctrl`.
-   - Stopgap if needed: `i2cset -y 3 0x49 0x0b <BATREG=0 | WEAKBAT bits>` to drop CV to 4.10 V. LK re-inits on
-     every boot, so this does not persist.
-2. **RTC**: MFD cell + DT node. Trivial, and gives timekeeping across reboots.
-3. **MT6328 AUXADC IIO driver + battery NTC (`ntc_thermistor`) + battery thermal zone**. Gives VBAT, TBAT, VBUS and
-   charger-present. This is a prerequisite for safe charging.
-4. **SM5414 charger driver** with the desk policy:
-   - 4.10 V CV, 500 mA charge current, 1 A input limit, AICL 4.4 V, 5.5 h fast-charge timer.
-   - nCHGEN temperature gate (0-45 °C).
-   - A battery power supply with OCV-based capacity.
-
-   After this step the device is safe to leave plugged in permanently.
-5. Optional: PMIC chip temperature and board NTC zones (cheap). Then the accelerometer.
-6. Last: SoC THERM_CTRL in auxadc_thermal (most work, least benefit at `maxcpus=1`).
+Done: read-only probe, RTC, MT6328 AUXADC + battery NTC + thermal zones, SM5414 charger driver with the desk policy,
+accelerometer, SoC thermal; see [status.md](status.md). Open: PMIC chip temperature and board NTC zones (optional).
 
 ## Open items to verify on hardware
-- The SM5414 register values after LK, and the reg 0x0E ID value.
+Answered: the SM5414 registers after LK (appendix), the accelerometer (BMA255 @0x18), the AUXADC AP path (works
+without the modem firmware). Still open:
 - Whether LK drives nCHGEN low (charging enabled) on a normal, non-KPOC boot.
 - The actual battery: 3500 mAh LiPo, 4.35 V class. The OCV profile peaks at 4.333 V, but the label is unverified.
-- Which accelerometer is populated.
-- MT6328 AUXADC: whether the AP request path works while the stock modem firmware is not loaded. Expected yes.
+
+## Appendix: SM5414 state left by LK (read 2026-11-16, i2c-2 = i2c3 @0x49, read-only)
+| reg | value | decode |
+|---|---|---|
+| 0x00–0x02 INT1–3 | 0x7C 0x25 0x0E | latched events (read-clear): UVLO, VBUSINOK, AICL, VBUSLIMIT, BATOVP; WEAKBAT, CHGRSTF, TOPOFF |
+| 0x06 STATUS | 0x22 | TOPOFF + BATDET: battery present, in top-off (near full) |
+| 0x07 CTRL | 0x42 | ENCOMPARATOR, CHGEN = 1 |
+| 0x08 VBUSCTRL | 0x07 | input limit 450 mA |
+| 0x09 CHGCTRL1 | 0x27 | AICL threshold 4.5 V, AICL on, AUTOSTOP off, precharge 450 mA |
+| 0x0A CHGCTRL2 | 0x0C | fast charge 700 mA |
+| 0x0B CHGCTRL3 | 0xAC | **BATREG 4.35 V**, WEAKBAT 3.6 V |
+| 0x0C CHGCTRL4 | 0x0D | top-off current 150 mA, DISLIMIT 5 |
+| 0x0D CHGCTRL5 | 0x0F | **FASTTIMER disabled**, top-off timer 45 min |
+| 0x0E | 0x43 | chip ID / present |
+
+Without a driver the battery is held at 4.35 V indefinitely, with no timer and no temperature cutoff (LK reprograms
+the charger on every boot). The SM5414 driver now sets the desk policy (status.md).
+
+Bus numbers in stage 2: i2c-0 = i2c1 (touch), i2c-1 = i2c2 (sensors), i2c-2 = i2c3 (charger).

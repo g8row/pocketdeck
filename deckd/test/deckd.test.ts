@@ -66,6 +66,6 @@ test("clock", () => {
 
 import { parseTablet } from "../providers/tablet.ts";
 test("tablet vitals parse", () => {
-  const t = parseTablet("  AC powered: false\n  USB powered: true\n  status: 2\n  level: 41\nMemTotal:  918548 kB\nMemAvailable:  482832 kB\n7384.12 2000.1\nfreq: 1092000\ninet 192.168.88.115\nzygote: running\n");
-  expect(t).toEqual({ battery: 41, charging: true, memFreeMb: 472, memTotalMb: 897, uptime: "2h 3m", cpuMhz: 1092, wifi: "192.168.88.115", mode: "android" });
+  const t = parseTablet("  AC powered: false\n  USB powered: true\n  status: 2\n  level: 41\nMemTotal:  918548 kB\nMemAvailable:  482832 kB\n7384.12 2000.1\nfreq: 1092000\ninet 10.0.0.15\nzygote: running\n");
+  expect(t).toEqual({ battery: 41, charging: true, memFreeMb: 472, memTotalMb: 897, uptime: "2h 3m", cpuMhz: 1092, wifi: "10.0.0.15", mode: "android" });
 });

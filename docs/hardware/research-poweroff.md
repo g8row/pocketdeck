@@ -1,7 +1,9 @@
-# TB-7304X mainline: power off and the long-press reset
+# TB-7304X: power off and the long-press reset
 
-Status 2026-11-16: kernel #24 (`patches/0010`, power off + deadman in `patches/mtk-rtc-boot-mode.c`, DT) is in
-`recovery` (sha256 4fe62937…, k22 backup in `backup/recovery-images/`). Tested on the tablet, see "Results".
+Status: current (bring-up notes; the live state is in [status.md](status.md))
+
+The fixes (`patches/0010`, power off + deadman in `patches/mtk-rtc-boot-mode.c`, DT) are in current kernels. The
+results below are from the 2026-11-16 test kernel ("#24"), booted by LK from `recovery` before U-Boot existed.
 
 ## What happened
 On 2026-11-16 `poweroff` on kernel #22 left the tablet stuck. The USB gadget was still enumerated, but there was no
@@ -57,18 +59,18 @@ Two bugs caused it:
 4. If KPOC ends up in Android, decide whether that's fine. The alternative is to stay in Linux on a charger
    ("off" = blank screen, CPUs offline, power key reboots).
 
-## Results on kernel #24 (2026-11-16)
+## Results (2026-11-16 test kernel)
 | Check | Result |
 |---|---|
 | `TOP_RST_MISC` under stock Android (3.18) | 0x209: `PWRKEY_RST_EN` = 1, TD = 0, `WDTRSTB_EN` = 1 |
-| `TOP_RST_MISC` under mainline #24 | 0x205: `PWRKEY_RST_EN` still 1, TD 0 (#22 cleared bit 9) |
+| `TOP_RST_MISC` under Linux with the fix | 0x205: `PWRKEY_RST_EN` still 1, TD 0 (the previous kernel cleared bit 9) |
 | `CHR_CON0` / `RTC_BBPU` / `RTC_PDN1` | 0x63 (CHRDET) / 0x0d / 0 on both kernels |
 | `poweroff` on USB | Gadget gone within ~7 s, preloader, then LK power-off charging: USB `0e8d:20ff` "Android", no adb. Stable. |
 | `poweroff` without USB | not tested yet |
 | Power key from KPOC, long-press reset time | not tested yet |
 
 Reading PMIC registers:
-- Mainline: `/sys/kernel/debug/regmap/10001000.pwrap/registers` is 11 bytes per register, stride 2, so use
+- Linux: `/sys/kernel/debug/regmap/10001000.pwrap/registers` is 11 bytes per register, stride 2, so use
   `dd bs=11 skip=$((addr/2)) count=1`.
 - Stock 3.18: `/sys/devices/platform/mt-pmic/pmic_access`. Input of **5 bytes or less including the newline**
   is a read (`echo 2a0`). Longer input is a write. `echo 0x2a0` with no value **oopses and panics the stock

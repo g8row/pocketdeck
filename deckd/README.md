@@ -107,4 +107,4 @@ websites open in your browser.
 - `hooks/claude-gate.sh` is the `PermissionRequest` hook for approving from the tablet. It is experimental and not
   installed by default.
 
-Install instructions are in [docs/ONBOARDING.md](../docs/ONBOARDING.md#6-claude-code-hooks-optional-but-the-claude-pane-needs-them).
+Install instructions are in [docs/ONBOARDING.md](../docs/install/05-pocketdeck.md#3-claude-code-hooks-optional-the-claude-pane-needs-them).

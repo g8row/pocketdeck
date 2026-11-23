@@ -40,3 +40,4 @@ backup/nvdata/
 device/wcn-tools/stp_uart_launcher
 device/wcn-tools/wmt_loader
 .pd.env
+.private-patterns

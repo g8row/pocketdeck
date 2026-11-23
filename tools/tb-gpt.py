@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Build the TB-7304X dual-boot GPT (docs/architecture/boot-chain.md §2) from a dump of the current one.
+# Build the TB-7304X dual-boot GPT (docs/architecture/boot-chain.md, "eMMC layout") from a dump of the current one.
 #
 #   tb-gpt.py build <first-512k-dump> <last-1m-dump> <outdir>
 #       writes <outdir>/primary-lba1-9.bin (header + entries, LBA 1..9), <outdir>/backup-entries.bin (LBA

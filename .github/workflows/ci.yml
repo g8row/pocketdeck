@@ -1,0 +1,12 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: deckd tests
+        run: cd deckd && bun test
+      - name: repo checks (links, stale names, privacy, shell syntax)
+        run: tools/check-repo.sh

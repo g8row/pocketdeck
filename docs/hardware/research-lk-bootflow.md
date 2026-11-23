@@ -1,11 +1,14 @@
-# Stock LK on the TB-7304X: boot flow, image contract, and the dual-boot decision
+# Stock LK on the TB-7304X: boot flow, image contract, and the boot chain decision
+
+Status: current (bring-up notes; the live state is in [status.md](status.md))
 
 **Date:** 2026-11-17. **Input:** `backup/partitions/lk.bin` (MTK LK, "Build time: Aug 28 2018 19:30:47", Thumb-2,
 linked at `0x41E00000`, 0x200-byte MTK header). **Method:** full capstone disassembly with string and literal
 annotation, function by function along the boot path; an offline model of LK's image checks
 ([`lk_image_check.py`](../../device/analysis/lk_image_check.py)); the session log of the 2026-11-16 tests.
-**Read with:** [plan-dualboot.md](plan-dualboot.md) (the decided design and live test status),
-[handoff-uboot-2026-11-17.md](handoff-uboot-2026-11-17.md), [plan-boot-recovery.md](../../plan-boot-recovery.md).
+**Read with:** [boot-chain.md](../architecture/boot-chain.md) (the decided design and test status),
+[research-stock-firmware.md](research-stock-firmware.md). The earlier U-Boot handoff and boot-recovery plan are
+retired (`docs/history/README.md`); what they taught is in [lessons](../dev/lessons.md).
 
 Every claim below carries the LK address it was read from. "Verified" means read in the disassembly.
 "Inferred" means it follows from the code plus the device logs, but was not observed directly.
@@ -276,7 +279,7 @@ Other observations explained by the same mechanism:
 - About 32 s per loop: preloader + LK + 5 s orange screen + load + 10–20 s WDT (dual mode).
   `last_kmsg` `hw_status: 2` and `wdt_by_pass_pwk` agree.
 - "LK honors BCB and the menu disappears": verified (§3.3).
-- The handoff's double-buffered-framebuffer hypothesis is not needed. U-Boot never ran in those boots.
+- The earlier U-Boot handoff's double-buffered-framebuffer hypothesis is not needed. U-Boot never ran in those boots.
 
 **Corrections to earlier documents:**
 - Handoff §4.1/§5 "LK's normal and BCB paths do not lead to a visible U-Boot": they do, for a contract-compliant image.
@@ -305,7 +308,7 @@ Other observations explained by the same mechanism:
 ## 7. The boot flow decision
 
 > Decided 2026-11-17. The full design (layout, GUI, migration, validation) is
-> [plan-dualboot.md](plan-dualboot.md). This section keeps the reasoning.
+> [boot-chain.md](../architecture/boot-chain.md). This section keeps the reasoning.
 
 Requirements: Linux boots by default with no input; Android stays one step away; no single bad image or bad U-Boot
 build can leave the tablet without a no-tools way back to Android.
@@ -343,14 +346,14 @@ Requirements this places on U-Boot (none of them is LK work):
 3. Own the watchdog. LK leaves 10 s armed. U-Boot's `WDT_MTK` autostart (15 s) is fine, and the Linux kernel must
    take it over in turn.
 4. Boot counter and fallback, kept in a raw record. Decided 2026-11-17: a dedicated 1 MiB `tbstate` partition
-   carved from `userdata` ([plan-dualboot.md §2, §4](plan-dualboot.md)). Until then, the unused tail of `boot`
+   carved from `userdata` ([boot-chain.md §2, §4](../architecture/boot-chain.md)). Until then, the unused tail of `boot`
    would also work: LK only reads the header and the kernel area.
 5. Never write `para`.
 
-Open item from the handoff: Magisk "direct install" patches the partition Android booted from. With Android in
+Open item: Magisk "direct install" patches the partition Android booted from. With Android in
 `recovery`, check what Magisk targets before updating it.
 
-### Second choice: mainline Linux directly in `boot` (option C)
+### Second choice: Linux directly in `boot` (option C)
 
 Simplest chain (LK → Linux). Android via the RTC bit only, always in LK recovery mode. No fallback before the
 kernel's own init, no `fastboot boot`. `boot-mainline.img` already passes §4. Choose this only if U-Boot work stalls.
@@ -368,17 +371,11 @@ kernel's own init, no `fastboot boot`. `boot-mainline.img` already passes §4. C
 Escapes, in order: power-cycle; Vol+ menu; LK fastboot + `fbusb`; BROM + mtkclient. Run `lk_image_check.py` on
 every image before writing it.
 
-| # | Layout | Action | Prediction | If wrong |
-|---|---|---|---|---|
-| **T0** reproduce | Android `boot`, **current** U-Boot `recovery` | From LK-booted Android, read ~1.5 GiB through the page cache (`dd if=$B/system of=/dev/null bs=1M count=1500`), then `adb reboot recovery` | LK logo + orange, no band, WDT reset, then **normal Android** (RTC bit already cleared) | If U-Boot starts, the stale-FDT mechanism is wrong; stop and re-analyse |
-| **T0b** control | same | light session, `adb reboot recovery` | U-Boot | — |
-| **T1** fix | Android `boot`, **padded** U-Boot `recovery` | repeat T0 (heavy I/O first) | U-Boot starts, `tbandroid` → Android | fix incomplete; Android comes back by itself |
-| **T2** | same | Vol+ menu → Recovery | U-Boot | — |
-| **T3** | **padded U-Boot `boot`**, Android `recovery` | cold power-on and plain `adb reboot`, each after heavy I/O | U-Boot → Android (from `recovery`, normal mode) | Vol+ → Recovery → Android, then restore |
-| **T4** | same | U-Boot fastboot `fastboot boot` mainline; Linux default once `boot-target` logic exists | Linux | same escape |
-| **T5** | same | charger plugged while off (KPOC) | Android charging UI via U-Boot (after requirement 2) | power off with the long press |
+Done: T0 (reproduce the loop: heavy page-cache I/O, then an LK → U-Boot boot from `recovery`), T1 (same with the
+padded image), T3 (padded U-Boot in `boot`, Android in `recovery`), T4 (Linux by default). The full validation table
+is in [boot-chain.md §8](../architecture/boot-chain.md).
 
-**Results, 2026-11-17** (the live table is in [plan-dualboot.md §8](plan-dualboot.md)):
+**Results, 2026-11-17:**
 - **T0 as first written** (old image, LK-launched Android, 1.5 GB read): **U-Boot started**. The prediction was
   wrong because an LK-launched kernel protects its FDT. That correction is now in §1.4.
 - **T0 corrected** (old image, Android started by U-Boot, then 2.5 GB read): reproduced. No U-Boot; reset after
@@ -386,7 +383,7 @@ every image before writing it.
 - **T1** (padded image, the same sequence): **U-Boot fastboot after 13 s.**
 - Found during T1: the freshly loaded DT carries `/firmware/android/mode = recovery`. `tbandroid` now patches it;
   Android reports `rtc` / `normal` and Magisk works.
-- New U-Boot bug: `fastboot continue` resets the tablet. Use `fastboot reboot`.
+- New U-Boot bug: `fastboot continue` reset the tablet (fixed since by a U-Boot patch).
 
 ---
 

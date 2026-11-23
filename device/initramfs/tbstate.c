@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * tbstate: read/write the TB-7304X boot record from Linux (stage 1 and 2) and from Android (root).
- * Format and location: device/u-boot/tbstate.h; design: docs/architecture/boot-chain.md §4.
+ * Format and location: device/u-boot/tbstate.h; design: docs/architecture/boot-chain.md, "The tbstate boot record".
  *
  *   tbstate [show]                 print the record as key=value lines (state=ok|blank|corrupt first)
  *   tbstate set key=value ...      default=linux|android  oneshot=none|linux|android|fastboot  attempts=<n>

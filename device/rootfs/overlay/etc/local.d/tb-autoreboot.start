@@ -12,7 +12,7 @@ for a in $(cat /proc/cmdline); do case "$a" in tb.autoreboot=*) T=${a#tb.autoreb
 (
 	sleep 60
 	[ -d /mnt/cache/linux ] && echo 0 > /mnt/cache/linux/bootcount; sync
-	# boot record: healthy resets U-Boot's attempt counter (stage 1 copies the tool in; plan-dualboot.md §4)
+	# boot record: healthy resets U-Boot's attempt counter (stage 1 copies the tool in; boot-chain.md, "The tbstate boot record")
 	/usr/local/sbin/tbstate healthy > /dev/null 2>&1 || logger -t tb7304 "tbstate healthy failed"
 	t=60
 	while [ "$T" -gt 0 ]; do

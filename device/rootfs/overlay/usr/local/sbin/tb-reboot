@@ -1,7 +1,7 @@
 #!/bin/sh
 # tb-reboot [android|linux|android-direct|default-android|default-linux|uboot|bootloader]
 # Layout: U-Boot in `boot`, Android in `recovery`; U-Boot picks the target from the boot record (`tbstate`,
-# docs/architecture/boot-chain.md §4 and "How to reach each target").
+# docs/architecture/boot-chain.md, "The tbstate boot record" and "How to reach each target").
 #   android          one-shot via U-Boot: Android in normal mode once, then Linux again (default)
 #   linux            one-shot via U-Boot: Linux (also when the default is android)
 #   android-direct   one-shot via LK's RTC recovery flag: Android started by LK directly, U-Boot not involved

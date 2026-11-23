@@ -1,6 +1,8 @@
-# TB-7304X mainline: WiFi / BT (MT6625L via CONSYS) — feasibility notes
+# TB-7304X: WiFi / BT (MT6625L via CONSYS) — feasibility notes
 
-Status 2026-11-19: **works at boot** from `tbkern_a`: 2.4 GHz scan, WPA2 association, DHCP, internet. The board is
+Status: current (bring-up notes; the live state is in [status.md](status.md))
+
+WiFi **works at boot** from the kernel slot: 2.4 GHz scan, WPA2 association, DHCP, internet. The board is
 2.4 GHz only (NVRAM). Association needs a saved AP in range; check `wpa_cli -i mt6625_0 status`. See "Bring-up".
 
 ## Hardware
@@ -58,7 +60,7 @@ gateway (~3 ms) and to 1.1.1.1 (~27 ms), a 3.9 MB download in about a second wit
 5 GHz (same day): the only 5 GHz AP in range was ch 108 (5540 MHz, DFS) at -93/-94 dBm. Pinned to it, 8 attempts
 in a minute: 5 auth timeouts (status 16), 3 associations, one complete WPA2 4-way handshake (CCMP), then lost after
 9 s (reason 100, beacon loss) and handshake timeouts (reason 15). So the 5 GHz path works (EAPOL both ways); the
-link failed on signal. **Wrong conclusion, corrected:** the Mac next to the tablet sees that AP at -45 dBm (ch 108,
+link failed on signal. **Wrong conclusion, corrected:** a laptop next to the tablet sees that AP at -45 dBm (ch 108,
 80 MHz, 960 Mbit/s), 48 dB more. The tablet's NVRAM says 5G Enable(0) Support(0) (efuse allows 5 GHz): Lenovo built
 the TB-7304X as 2.4 GHz only, and stock Android follows the NVRAM. frank-w's tree forced 5 GHz on (BPI-R2
 workaround); the BSP logic is restored in wlan_lib.c and logs `wlan: NVRAM 5G ... -> 5 GHz off`. Scans are 2.4 GHz
@@ -79,24 +81,14 @@ Problems found on the way (all fixed in the tree):
 
 Not done: RF clock buffer (CONSYS_CLOCK_BUF_CTRL; the clock is evidently running), EMI MPU, the fbdev
 screen-state hint, GPS, FM. BT is built in (`CONFIG_BT`, `MTK_COMBO_BT`) and powers on (`hci0`), but scans return
-nothing yet (STATUS.md).
+nothing yet ([status.md](status.md)).
 
-## Plan sketch (out-of-tree, not upstreamable)
-1. Take frank-w's 5.15-main `drivers/misc/mediatek/{btif,connectivity}` and forward-port to 7.0 (cfg80211,
-   timer, procfs, kthread, DMA API drift since 5.15).
-2. Replace the MT7623 CONSYS platform code with MT6735's from the downstream 3.18 BSP: CONN power domain
-   (mainline genpd), clocks, CONSYS reset, EMI reserved memory (add a `reserved-memory` node at the address the
-   stock DT/LK uses), BTIF base/IRQ, CONSYS IRQs.
-3. Firmware from the tablet's Android `/system/etc/firmware` (WMT_SOC.cfg, ROM patch, WIFI RAM code) into the rootfs.
-4. Userspace: wmt_loader / stp launcher equivalents (from frank-w's tree or the BSP), then `wlan_gen2` →
-   `wlan0`, wpa_supplicant.
-
-Effort: weeks; risk: high (CONSYS power-on and EMI layout are the unknowns). Value for the desk use case is moderate
-— USB already provides power + network to the host. Order: read the stock DT's consys/btif/reserved-memory nodes and
-the BSP platform layer first, then decide.
+## Plan sketch
+Done: frank-w's 5.15 `btif`/`connectivity` forward-ported to 7.0 with the MT6735 BSP platform layer, firmware and
+NVRAM from Android, open-source loader/launcher; see `device/wcn`, `patches/0011` and [status.md](status.md).
 
 ## Inputs collected (2026-11-17)
-- **Android /system** copied to this Mac: `backup/system.tar` (3.3 GB, `tar -C /mnt/sys -cf - .` over tb.sh from
+- **Android /system** copied to the host: `backup/system.tar` (3.3 GB, `tar -C /mnt/sys -cf - .` over tb.sh from
   `mmcblk0p20` mounted ro) and unpacked in `backup/system/`. Both gitignored.
 - **Firmware** in `backup/system/vendor/firmware/` (`/system/etc/firmware` does not exist on this build):
   `WMT_SOC.cfg` (80 B: `coex_wmt_ant_mode=1`, `wmt_gps_lna_pin=0`, `wmt_gps_lna_enable=0`, `co_clock_flag=3`),
@@ -107,7 +99,7 @@ the BSP platform layer first, then decide.
   (`/dev/wmtdetect`, chip id), `wmt_launcher` (`/dev/stpwmt`, `-p /vendor/firmware`, `WMT_SOC.cfg`),
   `wmt_concurrency`, `wmt_loopback`, `stp_dump3`, `autokd`. The stock kernel builds the driver in (no `.ko`).
   Plan: build the open-source loader/launcher equivalents (frank-w's BPI-R2 tools) against musl.
-- **Sources** on taos under `/build/alex/wifi/` (sparse clones):
+- **Sources** on the build host (sparse clones):
   - `frankw/` = frank-w BPI-Router-Linux `5.15-main`, `drivers/misc/mediatek/{btif,connectivity,include}`.
     Platform layer: `connectivity/common/conn_soc/mt7623/` (1772 lines); WLAN HIF `wlan/gen2/os/linux/hif/ahb/mt8127`.
   - `bsp2/` = `dhirajms/kernel_lenovo_P1m_3.18.y` (`p1mup`), MT6735 3.18 BSP: **`conn_soc/mt6735/`**
@@ -119,15 +111,8 @@ the BSP platform layer first, then decide.
   - `bsp/` (maozi-114 3.18.79) has only the build-in adapter stubs; the driver lives out of tree there. Not useful.
 
 ## Next steps
-> These three steps were completed on 2026-11-17; the result is in `device/wcn` and `patches/0011`. The list is
-> kept as the original plan.
-
-1. Diff `bsp2` vs `frankw` `conn_soc/` (35 differing files) and `btif/` to separate MT6735 platform code from
-   the 3.18 to 5.15 API port.
-2. Import frank-w's tree into `device/src/` as an out-of-tree module or patch set, add `conn_soc/mt6735` and
-   `hif/ahb/mt6735`, port to 7.0.
-3. DT: `consys`, `btif`, `wifi` nodes and a `reserved-memory` node; check the mainline mt6735 clock IDs for
-   `conn`/`bus` and the CONN power domain.
+Done: the BSP/frank-w diff, the import into the kernel tree (`device/wcn`, `patches/0011`) and the DT nodes. Open: Bluetooth
+scans (vendor init commands), RF clock buffer, EMI MPU, GPS, FM.
 
 ## Sources
 - OpenWrt forum, UFI6735 (MT6735 has no usable mainline support): https://forum.openwrt.org/t/ufi6735-mediatek-mt6735-4g-lte-wifi-usb-stick-router/141528

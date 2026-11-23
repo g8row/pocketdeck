@@ -5,7 +5,7 @@
 #  - self-reboots after tb.autoreboot=<s> seconds (default 300) unless /tmp/stay exists, so the tablet returns to
 #    Android with nobody touching it. Only reached when stage 2 is not started (tb.r=0, 2 failed tries, no rootfs).
 #    Linux is the default boot target (U-Boot in `boot`), so the reboot sets LK's one-shot RTC recovery flag:
-#    LK then starts Android from `recovery` directly (docs/architecture/boot-chain.md §1).
+#    LK then starts Android from `recovery` directly (docs/architecture/boot-chain.md, "Overview").
 /bin/busybox mkdir -p /bin /sbin /usr/bin /usr/sbin /proc /sys /dev /tmp /run /www
 /bin/busybox --install -s
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
@@ -163,7 +163,7 @@ ls /www > /dev/null
 log "ready: serial on ttyGS0, telnet/http on 172.16.42.1"
 dmesg | grep -i -E 'lkfb|simple|musb|udc|mmc0|wdt|watchdog' > /dev/tty0 2>/dev/null
 
-# ---- 3c. stage 2: Alpine (docs/architecture/boot-chain.md §2, research-rootfs.md) -----------------------------
+# ---- 3c. stage 2: Alpine (docs/architecture/boot-chain.md, "eMMC layout", research-rootfs.md) -----------------------------
 # U-Boot puts tb.slot=<a|b|cache|rescue> at the front of the cmdline (no tb.slot: an older U-Boot, same as cache).
 #   a/b     root on tbroot_a/b (ext4, `e2fsck -p` first); on failure the cache image below is tried
 #   cache   root in /cache/linux/rootfs.img (loop); stage 1 gives up after 2 failed tries (bootcount, reset by
@@ -238,7 +238,7 @@ try_cache() {
 try_rootfs() {
 	[ "$ROOTMODE" = 0 ] && { log "stage 2 off"; return 1; }
 	mkdir -p /newroot
-	# boot record (docs/architecture/boot-chain.md §4): stage 1 is up and the eMMC answers. U-Boot counted the
+	# boot record (docs/architecture/boot-chain.md, "The tbstate boot record"): stage 1 is up and the eMMC answers. U-Boot counted the
 	# attempt; stage 2 marks it healthy after 60 s. Best effort: a missing tool or partition only logs.
 	tbstate stage kernel > /dev/null 2>&1 || log "tbstate: could not record stage kernel"
 	case "$SLOT" in
@@ -256,7 +256,7 @@ try_rootfs() {
 	for m in dev proc sys; do mount --move /$m /newroot/$m; done
 	exec switch_root /newroot /sbin/init
 }
-# ---- 3d. boot menu (docs/architecture/boot-chain.md §5) -----------------------------------------------
+# ---- 3d. boot menu (docs/architecture/boot-chain.md, "Stage-1 boot menu") -----------------------------------------------
 # tb.menu=<s> on the cmdline sets the countdown (default 3), tb.menu=0 skips it. bootmenu only returns a choice;
 # anything unexpected (no framebuffer, crash) is choice 0 = continue Linux, so the menu cannot block a boot.
 MENU=3

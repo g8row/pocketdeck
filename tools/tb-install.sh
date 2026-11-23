@@ -86,7 +86,7 @@ rootfs)
 	[ "$want" = "$have" ] || { echo "rootfs read-back mismatch ($have != $want)"; exit 1; }
 	"$TB" "cd /; e2fsck -f -y $RDEV > /tmp/e2fsck.log 2>&1; [ \$? -lt 4 ] || { cat /tmp/e2fsck.log; exit 1; }
 		resize2fs $RDEV > /tmp/resize2fs.log 2>&1 || { cat /tmp/resize2fs.log; exit 1; }
-		mkdir -p /mnt/newroot && mount $RDEV /mnt/newroot && tar -C /mnt/newroot -xf /tmp/keep/keep.tar && sync &&
+		mkdir -p /mnt/newroot && mount $RDEV /mnt/newroot && { [ ! -s /tmp/keep/keep.tar ] || tar -C /mnt/newroot -xf /tmp/keep/keep.tar; } && sync &&
 		df -h /mnt/newroot | tail -1 && ls /mnt/newroot/opt /mnt/newroot/etc/firmware 2>/dev/null | tr '\n' ' '
 		cd /; umount /mnt/newroot; rm -rf /tmp/keep"
 	echo; echo "rootfs: written, verified, grown; kept files restored"

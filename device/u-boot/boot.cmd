@@ -2,7 +2,7 @@
 # CONFIG_BOOTCOMMAND sources it. Edit and rebuild the image; no U-Boot recompile needed.
 #
 # The target comes from the boot record (`tbstate`, two copies in the `tbstate` partition; device/u-boot/tbstate.h,
-# docs/architecture/boot-chain.md §4), written by Linux/Android with the `tbstate` tool:
+# docs/architecture/boot-chain.md, "The tbstate boot record"), written by Linux/Android with the `tbstate` tool:
 #   oneshot (consumed here) > default (linux unless set to android)
 # Always Android: LK bootmode 7/8/9 (RTC alarm, charger plugged in while off), a record that cannot be read or is
 # corrupt, and Linux after more than `max` boots in a row that never reached "healthy" (stage 2 resets the count

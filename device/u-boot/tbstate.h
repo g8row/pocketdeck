@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * TB-7304X boot record ("tbstate"), shared by U-Boot (tb7304x_tbstate.c) and Linux/Android
- * (device/initramfs/tbstate.c). Design: docs/architecture/boot-chain.md §4.
+ * (device/initramfs/tbstate.c). Design: docs/architecture/boot-chain.md, "The tbstate boot record".
  *
  * Two 512-byte copies, each with magic, version, generation and a CRC32 (zlib polynomial, over the whole block
  * with the crc field zero). Readers take the valid copy with the higher generation. Writers write generation+1
  * into the slot (generation & 1), i.e. always over the OLDER copy, so a power loss leaves the other one intact.
  *
- * Location: the start of the 1 MiB `tbstate` GPT partition (mmcblk0p24, plan-dualboot.md §2). Until 2026-11-18 the
+ * Location: the start of the 1 MiB `tbstate` GPT partition (mmcblk0p24, boot-chain.md, "eMMC layout"). Until 2026-11-18 the
  * record lived in the last 1 MiB of `boot`; that old copy is left there and no longer read.
  */
 #ifndef TBSTATE_H

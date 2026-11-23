@@ -89,7 +89,7 @@ boot)
 flash)
   img=${2:?flash <image> <boot|recovery>}; part=${3:?flash <image> <boot|recovery>}
   case "$part" in
-  recovery) [ "${YES:-}" = 1 ] || { echo "recovery holds Android + Magisk (plan-dualboot.md). Set YES=1 to overwrite it."; exit 1; } ;;
+  recovery) [ "${YES:-}" = 1 ] || { echo "recovery holds Android + Magisk (boot-chain.md). Set YES=1 to overwrite it."; exit 1; } ;;
   boot) python3 -I device/analysis/lk_image_check.py "$img" || { echo "LK would not boot $img reliably"; exit 1; } ;;
   *) echo "only boot or recovery"; exit 1 ;;
   esac

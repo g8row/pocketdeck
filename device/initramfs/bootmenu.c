@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * bootmenu: the TB-7304X stage-1 boot chooser (docs/architecture/boot-chain.md §5).
+ * bootmenu: the TB-7304X stage-1 boot chooser (docs/architecture/boot-chain.md, "Stage-1 boot menu").
  *
  *   bootmenu <seconds> [status line]
  *

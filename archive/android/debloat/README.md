@@ -11,7 +11,7 @@ modified, and deleting the module and rebooting restores stock behaviour.
 - MTK test and engineering tools;
 - wallpapers, the print spooler and other apps a desk display never uses.
 
-`remove.txt` is the full list, and `../backup/packages-{stock,stripped}.txt` show 124 → 45 packages.
+`remove.txt` is the full list, and `packages-{stock,stripped}.txt` show 124 → 45 packages.
 `data-apps.txt` lists updates installed in `/data` that had to be uninstalled by hand once. Don't `pm uninstall`
 GmsCore on Android 7: its shared UID crashes system_server.
 
