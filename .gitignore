@@ -13,18 +13,18 @@ device/src/
 device/out/
 device/**/*.img
 device/**/*.gz
-deskd/deskd.log
+deckd/deckd.log
+deckd/deskd.log
 device/stock/*.raw
 device/stock/Image
 *.apk
 .site-preview/
 # private / device-specific — never publish
 backup/*
-!backup/packages-stock.txt
-!backup/packages-stripped.txt
-deskd/desk.config.json
-kiosk/*.bin
-kiosk/fb-front.png
+deckd/deck.config.json
+deckd/desk.config.json
+archive/android/kiosk/*.bin
+archive/android/kiosk/fb-front.png
 .claude/
 shots/
 tools/apks/
