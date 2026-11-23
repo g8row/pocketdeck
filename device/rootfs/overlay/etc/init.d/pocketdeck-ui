@@ -1,12 +1,12 @@
 #!/sbin/openrc-run
-# PocketJS desk companion on the panel (fb0 + Goodix touch), restarted if it dies.
-# Binary and bundle: /opt/pocketjs (tools/pocketjs-deploy.sh). Options: /etc/conf.d/pocketjs.
-description="PocketJS desk companion (kiosk host)"
+# The PocketDeck UI on the panel (PocketJS Linux host: DRM/KMS + Goodix touch), restarted if it dies.
+# Binary and bundle: /opt/pocketjs (tools/pocketjs-deploy.sh). Options: /etc/conf.d/pocketdeck-ui.
+description="PocketDeck UI (PocketJS Linux host)"
 supervisor=supervise-daemon
 command=/opt/pocketjs/pocketjs-kiosk
 command_args="${POCKETJS_BUNDLE:-/opt/pocketjs/bundle}"
-output_log=/var/log/pocketjs.log
-error_log=/var/log/pocketjs.log
+output_log=/var/log/pocketdeck-ui.log
+error_log=/var/log/pocketdeck-ui.log
 respawn_delay=2
 respawn_max=0
 

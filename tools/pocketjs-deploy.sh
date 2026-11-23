@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build PocketJS for the tablet's mainline Alpine and install it as the `pocketjs` OpenRC service.
+# Build the PocketDeck UI (PocketJS Linux host + app bundle) and install it as the `pocketdeck-ui` OpenRC service.
+# A `pocketjs` service from before the rename is stopped and removed.
 #   tools/pocketjs-deploy.sh [app-manifest]      (default: apps/desk/pocket.json)
 # Needs on the host (user-level is fine): rustup + target aarch64-unknown-linux-musl, Zig (cross C compiler for
 # QuickJS; ZIG=path, default ~/.local/opt/zig-*/zig), Bun. Links with Rust's own rust-lld + self-contained musl,
@@ -54,12 +55,17 @@ echo "▸ push to $TAB:/opt/pocketjs"
 ssh_tab 'mkdir -p /opt/pocketjs/bundle.new && rm -f /opt/pocketjs/bundle.new/*'
 ssh_tab 'cat > /opt/pocketjs/pocketjs-kiosk.new && chmod 755 /opt/pocketjs/pocketjs-kiosk.new' < "$BIN"
 tar -C "$WORK/bundle" -c . | ssh_tab 'tar -C /opt/pocketjs/bundle.new -x --no-same-owner'
-tar -C "$OVL" -c etc/init.d/pocketjs etc/conf.d/pocketjs | ssh_tab 'tar -C / -x --no-same-owner'
+tar -C "$OVL" -c etc/init.d/pocketdeck-ui etc/conf.d/pocketdeck-ui | ssh_tab 'tar -C / -x --no-same-owner'
 ssh_tab 'set -e; cd /opt/pocketjs
-	rc-service pocketjs stop >/dev/null 2>&1 || true
+	if [ -e /etc/init.d/pocketjs ]; then   # pre-rename service
+		rc-service pocketjs stop >/dev/null 2>&1 || true
+		rc-update del pocketjs default >/dev/null 2>&1 || true
+		rm -f /etc/init.d/pocketjs /etc/conf.d/pocketjs
+	fi
+	rc-service pocketdeck-ui stop >/dev/null 2>&1 || true
 	mv pocketjs-kiosk.new pocketjs-kiosk; rm -rf bundle; mv bundle.new bundle
-	rc-update add pocketjs default >/dev/null
+	rc-update add pocketdeck-ui default >/dev/null
 	sync'
 if [ -z "${NO_START:-}" ]; then
-	ssh_tab 'rc-service pocketjs start && sleep 3 && rc-service pocketjs status; tail -n 8 /var/log/pocketjs.log'
+	ssh_tab 'rc-service pocketdeck-ui start && sleep 3 && rc-service pocketdeck-ui status; tail -n 8 /var/log/pocketdeck-ui.log'
 fi

@@ -16,7 +16,7 @@ OUT=$(mkdir -p "${2:-$HERE/out}" && cd "${2:-$HERE/out}" && pwd)
 BIN=$(cd "$HERE/../out" && pwd)
 MESA=${MESA:-$HERE/../gpu/out/mesa-opt.tar.gz}
 ALPINE=3.24 V=3.24.4 SIZE=${SIZE:-512M}
-# curl gdb: debugging; libdrm expat zstd-libs zlib: Mesa (/opt/mesa) and the PocketJS kiosk; iw wpa_supplicant: WiFi
+# curl gdb: debugging; libdrm expat zstd-libs zlib: Mesa (/opt/mesa) and the PocketJS host; iw wpa_supplicant: WiFi
 PKGS="alpine-base busybox-extras dropbear dropbear-scp e2fsprogs e2fsprogs-extra nano htop evtest i2c-tools curl gdb musl-utils"
 PKGS="$PKGS libdrm expat zstd-libs zlib iw wpa_supplicant"
 TOOLS="tbstate peek poke swipe wmt_loader stp_uart_launcher bbdeb"
@@ -45,7 +45,7 @@ docker run --rm -v "$HERE/overlay:/overlay:ro" -v "$OUT:/out" alpine:$ALPINE sh 
   # hwclock: the MT6328 RTC (patches/0012); the kernel also reads it at boot. ntpd (busybox, pool.ntp.org) corrects
   # it once WiFi is up and the kernel writes NTP time back (RTC_SYSTOHC); hwclock writes it at shutdown too.
   for s in hostname bootmisc sysctl syslog networking urandom hwclock; do ln -sf /etc/init.d/\$s \$R/etc/runlevels/boot/; done
-  for s in dropbear local wifi ntpd pocketjs; do ln -sf /etc/init.d/\$s \$R/etc/runlevels/default/; done
+  for s in dropbear local wifi ntpd pocketdeck-ui; do ln -sf /etc/init.d/\$s \$R/etc/runlevels/default/; done
   for s in killprocs savecache; do ln -sf /etc/init.d/\$s \$R/etc/runlevels/shutdown/; done
   mkdir -p \$R/root/.ssh \$R/mnt/cache; chmod 700 \$R/root/.ssh
   install -m 600 /out/authorized_keys \$R/root/.ssh/authorized_keys

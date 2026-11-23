@@ -168,10 +168,10 @@ export async function tabletShell(script: string): Promise<{ via: Via; out: stri
   return null;
 }
 
-// Mainline kiosk: it draws through DRM, so fb0 only holds the text console. A
-// kiosk built with the dump handler writes its front buffer (tight BGRX) on
+// Linux UI host: it draws through DRM, so fb0 only holds the text console. A
+// host built with the dump handler writes its front buffer (tight BGRX) on
 // SIGUSR1; only signal a binary that has it (SIGUSR1's default action is to
-// exit). Older kiosks / plain fbdev: read fb0. Prints "w,h stride bpp\n" + raw.
+// exit). Older hosts / plain fbdev: read fb0. Prints "w,h stride bpp\n" + raw.
 const SHOT = `f=/sys/class/graphics/fb0; g=$(cat $f/virtual_size); w=\${g%,*}; h=\${g#*,}; n=$((w*h*4)); d=/tmp/pocketjs-front.raw
 p=$(pidof pocketjs-kiosk | cut -d' ' -f1)
 if [ -n "$p" ] && grep -q pocketjs-front.raw /proc/$p/exe 2>/dev/null; then
@@ -245,7 +245,7 @@ export function encodePng(rgb: Uint8Array, w: number, h: number): Uint8Array {
 }
 
 /** XRGB8888 (BGRA bytes) framebuffer → PNG. A portrait panel (the TB-7304X is
- *  600×1024) is turned to landscape the way the kiosk draws on it: output row =
+ *  600×1024) is turned to landscape the way the UI host draws on it: output row =
  *  panel column, right to left (same as tools/fb2png.py). */
 export function fbToPng(fb: Uint8Array, w: number, h: number, stride: number): Uint8Array | null {
   if (fb.length < h * stride) return null;

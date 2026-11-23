@@ -3,7 +3,7 @@ POCKETJS_POWER=ignore
 # deckd address; default 127.0.0.1:7777 (ssh -R 7777:127.0.0.1:7777 root@172.16.42.1 from the host).
 #POCKETJS_LINK=172.16.42.2:7777
 # The cracked glass reports phantom contacts at fixed spots. Rects in raw panel pixels (portrait 600x1024),
-# "x0,y0,x1,y1;...": a contact that STARTS in one is dropped by the kiosk host for its whole life. Measured
+# "x0,y0,x1,y1;...": a contact that STARTS in one is dropped by the PocketJS host for its whole life. Measured
 # 2026-11-17 with nobody touching (~1.4 phantom contacts/s, 96% start in the first rect; the second is one spot
 # at the left edge). In the landscape UI the first rect is logical x 0-62, y 65-115. Empty = no mask.
 POCKETJS_TOUCH_MASK="370,0,470,125;0,105,15,130"

@@ -1,5 +1,5 @@
 // swipe [dev] [l|r] [count] [gap_ms]: inject horizontal swipes (landscape UI) into the Goodix touchscreen's evdev
-// node; readers of the node (the kiosk) see them as touches. One contact, panel x 300, panel y 850 -> 170 (l) or
+// node; readers of the node (the UI host) see them as touches. One contact, panel x 300, panel y 850 -> 170 (l) or
 // 170 -> 850 (r) in 12 steps of 16 ms. Defaults: /dev/input/event2 l 1 300.
 #include <fcntl.h>
 #include <linux/input.h>
