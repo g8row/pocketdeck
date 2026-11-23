@@ -2,8 +2,8 @@
 
 import { $ } from "bun";
 import os from "node:os";
-import { readArtwork, readMusic } from "../providers/music.ts";
-import type { Host, HostState } from "./types.ts";
+import { musicControls, readArtwork, readMusic } from "../providers/music.ts";
+import type { Host, HostState, MemInfo, ScreenState } from "./types.ts";
 
 const osa = (script: string) => $`osascript -e ${script}`.quiet().nothrow();
 const osaQ = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -27,17 +27,46 @@ async function readState(): Promise<HostState | null> {
 
 let micRestore = 75;
 
+/** `vm_stat` → used bytes like Activity Monitor's "memory used" (app + wired + compressed). Pure; tested. */
+export function usedFromVmStat(out: string): number {
+  const page = Number(/page size of (\d+)/.exec(out)?.[1] ?? 16384);
+  const get = (label: string) => Number(new RegExp(`${label}:\\s+(\\d+)`).exec(out)?.[1] ?? 0) * page;
+  return Math.max(0, get("Anonymous pages") - get("Pages purgeable") + get("Pages wired down") + get("Pages occupied by compressor"));
+}
+
+async function memInfo(): Promise<MemInfo | null> {
+  const r = await $`vm_stat`.quiet().nothrow();
+  if (r.exitCode !== 0) return null;
+  return { used: usedFromVmStat(r.stdout.toString()), total: os.totalmem() };
+}
+
+/** UNTESTED on a Mac (written on Linux). Locked: the console session's CGSSessionScreenIsLocked
+ *  (ioreg Root). Asleep: IODisplayWrangler below power state 4 (Intel Macs; Apple silicon
+ *  has no wrangler, so it reports only active / locked). */
+export function parseMacScreen(rootIoreg: string, wrangler: string): ScreenState {
+  const ps = /"CurrentPowerState"\s*=\s*(\d+)/.exec(wrangler);
+  if (ps && Number(ps[1]) < 4) return "asleep";
+  return /"CGSSessionScreenIsLocked"\s*=\s*Yes/.test(rootIoreg) ? "locked" : "active";
+}
+
+async function screen(): Promise<ScreenState> {
+  const [root, wr] = await Promise.all([
+    $`ioreg -n Root -d1`.quiet().nothrow(),
+    $`ioreg -n IODisplayWrangler -r -d1`.quiet().nothrow(),
+  ]);
+  return parseMacScreen(root.stdout.toString(), wr.stdout.toString());
+}
+
 export const darwin: Host = {
   name: "macOS",
 
   /** Used memory % like Activity Monitor's "memory used" (app + wired + compressed). */
   async memPercent() {
-    const out = (await $`vm_stat`.quiet().nothrow()).stdout.toString();
-    const page = Number(/page size of (\d+)/.exec(out)?.[1] ?? 16384);
-    const get = (label: string) => Number(new RegExp(`${label}:\\s+(\\d+)`).exec(out)?.[1] ?? 0) * page;
-    const used = get("Anonymous pages") - get("Pages purgeable") + get("Pages wired down") + get("Pages occupied by compressor");
-    return Math.max(0, Math.min(100, Math.round((100 * used) / os.totalmem())));
+    const m = await memInfo();
+    return m ? Math.max(0, Math.min(100, Math.round((100 * m.used) / m.total))) : 0;
   },
+  memInfo,
+  screen,
 
   readState,
 
@@ -86,7 +115,7 @@ end tell`),
     "music.prev": "Music previous track",
   },
 
-  music: { read: readMusic, artwork: readArtwork },
+  music: { read: readMusic, artwork: readArtwork, ...musicControls },
 
   async notify(title, body) {
     await osa(`display notification "${osaQ(body)}" with title "${osaQ(title)}"`);

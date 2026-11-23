@@ -4,12 +4,12 @@
 // wlroots and X11 tools in turn and use the first one that exists.
 
 import { $ } from "bun";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import * as mpris from "../providers/mpris.ts";
 import { Bus } from "./dbus.ts";
-import type { Host, HostState } from "./types.ts";
+import type { Host, HostState, MemInfo, ScreenState } from "./types.ts";
 
 const has = (cmd: string) => !!Bun.which(cmd);
 const desktop = (process.env.XDG_CURRENT_DESKTOP ?? "").toUpperCase();
@@ -362,6 +362,46 @@ export function memFromMeminfo(s: string): number {
   return Math.max(0, Math.min(100, Math.round((100 * (total - get("MemAvailable"))) / total)));
 }
 
+/** /proc/meminfo → used (MemTotal − MemAvailable) and total, bytes. */
+export function memInfoFromMeminfo(s: string): MemInfo | null {
+  const get = (k: string) => Number(new RegExp(`^${k}:\\s+(\\d+)`, "m").exec(s)?.[1] ?? 0) * 1024;
+  const total = get("MemTotal");
+  return total ? { used: Math.max(0, total - get("MemAvailable")), total } : null;
+}
+
+// ---- screen: locked / asleep ---------------------------------------------------------
+
+/** DRM connectors as [status, dpms] ("connected", "On"). Asleep = every connected output is off. */
+export function displaysAsleep(conns: [string, string][]): boolean {
+  const on = conns.filter(([st]) => st.trim() === "connected");
+  return on.length > 0 && on.every(([, dpms]) => dpms.trim() !== "On");
+}
+
+function readDrm(): [string, string][] {
+  const out: [string, string][] = [];
+  try {
+    for (const c of readdirSync("/sys/class/drm")) {
+      if (!/^card\d+-/.test(c)) continue;
+      try {
+        out.push([readFileSync(`/sys/class/drm/${c}/status`, "utf8"), readFileSync(`/sys/class/drm/${c}/dpms`, "utf8")]);
+      } catch {}
+    }
+  } catch {}
+  return out;
+}
+
+/** `loginctl show-session -p LockedHint` output → locked? */
+export const lockedHint = (out: string) => /^LockedHint=yes$/m.test(out);
+
+let sessionId: string | null = null;
+async function screen(): Promise<ScreenState> {
+  if (displaysAsleep(readDrm())) return "asleep";
+  if (!sessionId) sessionId = has("loginctl") ? await graphicalSession() : null;
+  if (!sessionId) return "active";
+  const r = await $`loginctl show-session ${sessionId} -p LockedHint`.quiet().nothrow();
+  return lockedHint(r.stdout.toString()) ? "locked" : "active";
+}
+
 // ---- the host -------------------------------------------------------------------------
 
 async function readState(): Promise<HostState | null> {
@@ -388,6 +428,16 @@ export const linux: Host = {
       return 0;
     }
   },
+
+  async memInfo() {
+    try {
+      return memInfoFromMeminfo(readFileSync("/proc/meminfo", "utf8"));
+    } catch {
+      return null;
+    }
+  },
+
+  screen,
 
   readState,
 
@@ -428,7 +478,14 @@ export const linux: Host = {
     "music.prev": "media previous track (MPRIS)",
   },
 
-  music: { read: mpris.readMusic, artwork: mpris.readArtwork },
+  music: {
+    read: mpris.readMusic,
+    artwork: mpris.readArtwork,
+    shuffle: mpris.toggleShuffle,
+    repeat: mpris.cycleRepeat,
+    seek: mpris.seekTo,
+    volume: mpris.setVolume,
+  },
 
   notify,
   sound,

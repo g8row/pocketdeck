@@ -25,7 +25,8 @@ import { scanUsage, usageState } from "./providers/usage.ts";
 import { focusAction, focusState, focusTick, newFocus, type Focus } from "./providers/focus.ts";
 import { bundleHash, encode, LineSplitter, type FromTablet, type ToTablet } from "./protocol.ts";
 import { clockState } from "./providers/clock.ts";
-import { cpuPercent, memPercent } from "./providers/sys.ts";
+import { sysState } from "./providers/sys.ts";
+import { hostState } from "./providers/host.ts";
 import { claudeState, getSession, lastMessage, onAlert, onHookEvent, permissionDecided, pollTranscripts } from "./providers/claude.ts";
 import { readTablet } from "./providers/tablet.ts";
 
@@ -36,6 +37,10 @@ const APP_MANIFEST = "apps/desk/pocket.json";
 const APP_DIR = join(POCKETJS, "apps/desk");
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
+/** Chatty lines (DECKD_DEBUG=1). */
+const debug = (...a: unknown[]) => {
+  if (env("DEBUG")) log(...a);
+};
 
 let cfg: DeckConfig = loadConfig().config;
 let focus: Focus = newFocus(cfg.focus.minutes);
@@ -183,7 +188,34 @@ async function runTile(t: Tile): Promise<{ ok: boolean; error?: string }> {
   return runAction(t.action, actions);
 }
 
+/** MUSIC page controls with arguments; each pushes the new music state right away. */
+const musicActions: Record<string, (args: any) => Promise<void>> = {
+  "music.shuffle": () => host.music.shuffle(),
+  "music.repeat": () => host.music.repeat(),
+  "music.seek": async (a) => {
+    const pos = Number(a?.pos);
+    if (Number.isFinite(pos) && pos >= 0) await host.music.seek(pos);
+  },
+  "music.volume": async (a) => {
+    const v = Number(a?.v);
+    if (Number.isFinite(v)) await host.music.volume(Math.max(0, Math.min(100, Math.round(v))));
+  },
+};
+
+/** Actions the tablet sends that need no work here (logged at debug level only). */
+const QUIET_ACTIONS = new Set(["sys.window"]); // the tablet picks the window; every window is sent
+
+let settleTimer: ReturnType<typeof setTimeout> | undefined;
 async function runTabletAction(id: string, args: any): Promise<void> {
+  if (QUIET_ACTIONS.has(id)) return;
+  if (id in musicActions) {
+    await musicActions[id]!(args);
+    await refreshMusic().catch(() => {});
+    // players apply property writes asynchronously: look once more shortly after
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => refreshMusic().catch(() => {}), 350);
+    return;
+  }
   const tile = cfg.tiles.find((t) => t.id === id);
   if (tile) {
     const r = await runTile(tile);
@@ -232,9 +264,9 @@ function onTablet(c: Client, msg: FromTablet) {
       for (const line of blobs.values()) send(c, line);
       break;
     case "action":
-      log(`action ${msg.id}${msg.args ? ` ${JSON.stringify(msg.args).slice(0, 80)}` : ""}`);
+      (QUIET_ACTIONS.has(msg.id) ? debug : log)(`action ${msg.id}${msg.args ? ` ${JSON.stringify(msg.args).slice(0, 80)}` : ""}`);
       runTabletAction(msg.id, msg.args)
-        .then(() => refreshFast())
+        .then(() => (QUIET_ACTIONS.has(msg.id) ? undefined : refreshFast()))
         .catch((e) => log(`action ${msg.id} failed: ${e}`));
       break;
     case "reloaded":
@@ -496,7 +528,8 @@ async function main() {
   });
 
   setInterval(() => setState("clock", clockState()), 1000);
-  setInterval(async () => setState("sys", { cpu: cpuPercent(), mem: await memPercent() }), 2000);
+  setInterval(() => sysState().then((s) => setState("sys", s)).catch(() => {}), 2000);
+  setInterval(() => hostState().then((h) => setState("host", h)).catch(() => {}), 2000);
   setInterval(() => refreshMusic().catch(() => {}), 1000);
   setInterval(() => refreshDeck().catch(() => {}), 5000);
   setInterval(() => pollTranscripts().then(pushClaude).catch(() => {}), 3000);
@@ -517,6 +550,7 @@ async function main() {
 
   setState("clock", clockState());
   setState("focus", focusState(focus));
+  hostState().then((h) => setState("host", h)).catch(() => {});
   readTablet().then((t) => t && setState("tablet", t)).catch(() => {});
   pushClaude();
   scanUsage()
