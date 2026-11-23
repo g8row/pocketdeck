@@ -10,7 +10,7 @@ set -euo pipefail
 # macOS tar would add AppleDouble ._* files for files with extended attributes; harmless elsewhere
 export COPYFILE_DISABLE=1
 HERE=$(cd "$(dirname "$0")" && pwd)
-ROOT=$(cd "$HERE/../pocketjs" && pwd)
+ROOT=$(cd "${POCKETJS_DIR:-$HERE/../pocketjs}" && pwd) # POCKETJS_DIR: build from another checkout (e.g. a worktree)
 OVL=$(cd "$HERE/../device/rootfs/overlay" && pwd)
 MANIFEST=${1:-apps/desk/pocket.json}
 TAB=${TAB:-root@172.16.42.1}
