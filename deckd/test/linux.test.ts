@@ -5,9 +5,9 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inflateSync } from "node:zlib";
-import { editorCommand, memFromMeminfo, parsePactl, parseWpctl, pickWindow, terminalArgv } from "../platform/linux.ts";
+import { displaysAsleep, editorCommand, lockedHint, memFromMeminfo, memInfoFromMeminfo, parsePactl, parseWpctl, pickWindow, terminalArgv } from "../platform/linux.ts";
 import { methodCall, parseMessages } from "../platform/dbus.ts";
-import { toMusic } from "../providers/mpris.ts";
+import { fromGetAll, loopToRepeat, nextLoop, shortPlayer, toMusic, volumePct } from "../providers/mpris.ts";
 import { parseTablet } from "../providers/tablet.ts";
 import { findDesktopEntry } from "../runner.ts";
 import { encodePng, fbToPng } from "../transport.ts";
@@ -50,8 +50,38 @@ describe("mpris", () => {
   });
   test("paused, stopped, nothing", () => {
     expect(toMusic({ bus: "x", status: "Paused", position: 0, meta: meta({ "xesam:title": ["s", "T"] }) }).state).toBe("paused");
-    expect(toMusic({ bus: "x", status: "Stopped", position: 0, meta: {} })).toEqual({ state: "stopped" });
+    expect(toMusic({ bus: "x", status: "Stopped", position: 0, meta: {} })).toEqual({ state: "stopped", player: "x" });
     expect(toMusic(null)).toEqual({ state: "off" });
+  });
+  test("LoopStatus ↔ repeat, volume 0–1 → 0–100", () => {
+    expect([loopToRepeat("None"), loopToRepeat("Playlist"), loopToRepeat("Track"), loopToRepeat(undefined), loopToRepeat("x")]).toEqual(["off", "all", "one", "off", "off"]);
+    // the tablet's cycle: off → all → one → off
+    expect([nextLoop("None"), nextLoop("Playlist"), nextLoop("Track"), nextLoop(undefined)]).toEqual(["Playlist", "Track", "None", "Playlist"]);
+    expect([volumePct(0), volumePct(0.62), volumePct(0.005), volumePct(1), volumePct(1.5), volumePct(-1)]).toEqual([0, 62, 1, 100, 100, 0]);
+  });
+  test("player names: short and lowercase", () => {
+    expect(shortPlayer("Spotify", "org.mpris.MediaPlayer2.spotify")).toBe("spotify");
+    expect(shortPlayer("Mozilla Firefox", "org.mpris.MediaPlayer2.firefox.instance_1_42")).toBe("firefox");
+    expect(shortPlayer("VLC media player", "org.mpris.MediaPlayer2.vlc")).toBe("vlc");
+    expect(shortPlayer("mpv Media Player", "org.mpris.MediaPlayer2.mpv")).toBe("mpv");
+    expect(shortPlayer("Google Chrome", "org.mpris.MediaPlayer2.chrome.instance9")).toBe("chrome");
+    expect(shortPlayer("", "org.mpris.MediaPlayer2.chromium.instance123")).toBe("chromium");
+    expect(shortPlayer(undefined, "org.mpris.MediaPlayer2.elisa")).toBe("elisa");
+  });
+  test("GetAll → player, shuffle, repeat, volume on the music state", () => {
+    const p = fromGetAll("org.mpris.MediaPlayer2.spotify", {
+      PlaybackStatus: { type: "s", data: "Playing" },
+      Metadata: { type: "a{sv}", data: meta({ "xesam:title": ["s", "Song"], "mpris:length": ["x", 300_000_000] }) },
+      Position: { type: "x", data: 12_000_000 },
+      Shuffle: { type: "b", data: true },
+      LoopStatus: { type: "s", data: "Track" },
+      Volume: { type: "d", data: 0.62 },
+    })!;
+    expect(toMusic({ ...p, identity: "Spotify" })).toMatchObject({ state: "playing", position: 12, duration: 300, player: "spotify", shuffle: true, repeat: "one", volume: 62 });
+    // a player without Shuffle / LoopStatus / Volume: the fields are left out, not guessed
+    const bare = fromGetAll("org.mpris.MediaPlayer2.vlc", { PlaybackStatus: { type: "s", data: "Stopped" } })!;
+    expect(toMusic(bare)).toEqual({ state: "stopped", player: "vlc" });
+    expect(fromGetAll("x", {})).toBeNull();
   });
   test("NoTrack ids don't make every song look the same", () => {
     const a = toMusic({ bus: "x", status: "Playing", position: 0, meta: meta({ "xesam:title": ["s", "One"], "mpris:trackid": ["o", "/org/mpris/MediaPlayer2/TrackList/NoTrack"] }) });
@@ -122,9 +152,44 @@ describe("dbus wire format", () => {
 
 test("mainline tablet vitals", () => {
   const t = parseTablet("MemTotal:  1000000 kB\nMemAvailable:  700000 kB\n3725.20 9000.10\nfreq: 1196000\nos: linux\n");
-  expect(t).toMatchObject({ memFreeMb: 684, memTotalMb: 977, uptime: "1h 2m", cpuMhz: 1196, mode: "mainline" });
+  expect(t).toMatchObject({ memFreeMb: 684, memTotalMb: 977, uptime: "1h 2m", cpuMhz: 1196, mode: "linux" });
   expect(t.battery).toBeUndefined();
+  expect(t.tempC).toBeUndefined();
   expect(parseTablet("cap: 80\nchg: Charging\nos: linux\n")).toMatchObject({ battery: 80, charging: true });
+  expect(parseTablet("os: mainline\n").mode).toBe("linux"); // the old marker still reads as linux
+});
+
+test("tablet battery sysfs: temp 0.1 °C, voltage µV, current µA signed as charging +", () => {
+  const t = parseTablet("cap: 76\nchg: Charging\ntemp: 312\nuv: 4021500\nua: 420300\nos: linux\n");
+  expect(t).toMatchObject({ battery: 76, charging: true, tempC: 31.2, volts: 4.02, currentMa: 420, mode: "linux" });
+  // drivers that report discharge as a positive number get the sign the page expects
+  expect(parseTablet("chg: Discharging\nua: 250000\nos: linux\n").currentMa).toBe(-250);
+  expect(parseTablet("chg: Discharging\nua: -250000\nos: linux\n").currentMa).toBe(-250);
+  expect(parseTablet("chg: Charging\nua: -300000\nos: linux\n").currentMa).toBe(300);
+  expect(parseTablet("chg: Full\nua: 0\ntemp: -45\nos: linux\n")).toMatchObject({ currentMa: 0, tempC: -4.5 });
+  // Android's dumpsys: temperature 0.1 °C, voltage mV, no current
+  const a = parseTablet("  status: 2\n  level: 41\n  voltage: 4012\n  temperature: 305\n  Max charging voltage: 5000000\nzygote: running\n");
+  expect(a).toMatchObject({ battery: 41, tempC: 30.5, volts: 4.01, mode: "android" });
+  expect(a.currentMa).toBeUndefined();
+});
+
+describe("host screen (linux)", () => {
+  test("asleep only when every connected output is off", () => {
+    expect(displaysAsleep([["connected\n", "On\n"], ["disconnected\n", "Off\n"]])).toBe(false);
+    expect(displaysAsleep([["connected\n", "Off\n"], ["disconnected\n", "Off\n"]])).toBe(true);
+    expect(displaysAsleep([["connected", "Off"], ["connected", "On"]])).toBe(false);
+    expect(displaysAsleep([["disconnected", "Off"]])).toBe(false); // no outputs: can't tell, not asleep
+    expect(displaysAsleep([])).toBe(false);
+  });
+  test("logind LockedHint", () => {
+    expect(lockedHint("LockedHint=yes\n")).toBe(true);
+    expect(lockedHint("LockedHint=no\n")).toBe(false);
+    expect(lockedHint("")).toBe(false);
+  });
+  test("memory in bytes from /proc/meminfo", () => {
+    expect(memInfoFromMeminfo("MemTotal:  16000000 kB\nMemFree: 1 kB\nMemAvailable:  6000000 kB\n")).toEqual({ used: 10_000_000 * 1024, total: 16_000_000 * 1024 });
+    expect(memInfoFromMeminfo("")).toBeNull();
+  });
 });
 
 describe("framebuffer → png", () => {

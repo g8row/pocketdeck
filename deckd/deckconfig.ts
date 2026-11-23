@@ -10,15 +10,15 @@ import { env } from "./env.ts";
 import { tiles as defaultTiles } from "./config.ts";
 
 export const PANES = {
-  home: "clock, now playing, claude + computer at a glance",
+  board: "host cpu / ram with 1m · 10m · 1h history, tablet battery",
   deck: "tappable action tiles",
-  music: "now playing (apple music / mpris): art, wave, transport",
   claude: "claude code sessions, detail, timeline, approvals",
-  pulse: "claude usage today: ascii token field + hourly bars",
-  board: "ops board: cell grid of every live number",
-  focus: "focus timer: a morphing shape that eats the time",
-  system: "frame-time graph + tablet spec table",
+  usage: "claude usage: today by hour, the last 7 days by day, projects",
+  music: "now playing (apple music / mpris): art, seek, shuffle, repeat, volume",
+  settings: "the tablet itself: brightness, wifi, battery, boot slot",
 } as const;
+/** Pane ids from before the redesign → their replacement (null = gone). */
+export const LEGACY_PANES: Record<string, PaneId | null> = { home: "board", pulse: null, focus: null, system: null };
 export type PaneId = keyof typeof PANES;
 
 export const COLORS = ["blue", "violet", "emerald", "amber", "rose", "latte", "zinc"] as const;
@@ -69,7 +69,8 @@ export interface Tile {
 }
 
 export interface DeckConfig {
-  version: 1;
+  /** 2 = the redesigned pane ids (board, deck, claude, usage, music, settings). */
+  version: 2;
   panes: PaneId[];
   accent: string; // hex
   tiles: Tile[];
@@ -89,8 +90,8 @@ export interface DeckConfig {
 
 export function defaultConfig(): DeckConfig {
   return {
-    version: 1,
-    panes: ["home", "claude", "deck", "music", "board", "system"], // pulse, focus: off for now (the deck app hides them too)
+    version: 2,
+    panes: Object.keys(PANES) as PaneId[],
     accent: ACCENTS.sky!,
     tiles: defaultTiles.map((t) => {
       const { sub: _sub, ...rest } = t;
@@ -130,15 +131,34 @@ function normAction(a: any): TileAction | null {
   return null;
 }
 
+/** A saved pane list → current ids. Old ids are renamed or dropped; a config from before
+ *  the redesign (version < 2) also gains the panes it could not have had (usage, settings),
+ *  each after its predecessor in the default order. Unknown ids and repeats are dropped. */
+export function migratePanes(raw: unknown[], version?: unknown): PaneId[] {
+  const out: PaneId[] = [];
+  for (const p of raw) {
+    if (typeof p !== "string") continue;
+    const id = p in LEGACY_PANES ? LEGACY_PANES[p] : p in PANES ? (p as PaneId) : null;
+    if (id && !out.includes(id)) out.push(id);
+  }
+  if (typeof version === "number" && version >= 2) return out;
+  const order = Object.keys(PANES) as PaneId[];
+  for (const id of ["usage", "settings"] as PaneId[]) {
+    if (out.includes(id) || !out.length) continue;
+    // after the nearest earlier default pane that's present, else first
+    const before = order.slice(0, order.indexOf(id)).reverse().find((x) => out.includes(x));
+    out.splice(before ? out.indexOf(before) + 1 : 0, 0, id);
+  }
+  return out;
+}
+
 /** Coerce anything (a hand-edited file, a UI PUT) into a valid config. Throws
  *  only on non-objects; bad fields fall back to defaults field by field. */
 export function normalizeConfig(raw: unknown): DeckConfig {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("config must be an object");
   const r = raw as Record<string, any>;
   const d = defaultConfig();
-  const panes = Array.isArray(r.panes)
-    ? [...new Set(r.panes.filter((p: unknown): p is PaneId => typeof p === "string" && p in PANES))]
-    : d.panes;
+  const panes = Array.isArray(r.panes) ? migratePanes(r.panes, r.version) : d.panes;
   const seen = new Set<string>();
   const tiles: Tile[] = [];
   for (const t of Array.isArray(r.tiles) ? r.tiles : d.tiles) {
@@ -169,7 +189,7 @@ export function normalizeConfig(raw: unknown): DeckConfig {
   const timeout = Number(c.approvalTimeoutSec);
   const minutes = Number(r.focus?.minutes);
   return {
-    version: 1,
+    version: 2,
     panes: panes.length ? panes : d.panes,
     accent: HEX.test(r.accent) ? r.accent.toLowerCase() : d.accent,
     tiles,

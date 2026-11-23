@@ -5,6 +5,14 @@
 
 import type { MusicState } from "../providers/music.ts";
 
+export type ScreenState = "active" | "locked" | "asleep";
+
+/** Used / total memory, bytes. */
+export interface MemInfo {
+  used: number;
+  total: number;
+}
+
 /** Live values behind the builtin tiles (volume pill, mic, caffeine). */
 export interface HostState {
   /** Output volume 0–100. */
@@ -24,6 +32,10 @@ export interface Host {
   name: string;
   /** Used memory, percent. */
   memPercent(): Promise<number>;
+  /** Used / total memory in bytes (same "used" as memPercent), or null. */
+  memInfo(): Promise<MemInfo | null>;
+  /** The host's screen: unlocked and on, locked, or off (DPMS). Fails soft to "active". */
+  screen(): Promise<ScreenState>;
   readState(): Promise<HostState | null>;
   /** Builtin tile actions (vol.up, mic.toggle, lock…). */
   actions: Record<string, Builtin>;
@@ -33,6 +45,14 @@ export interface Host {
     read(): Promise<MusicState>;
     /** size×size RGBA8, or null when the track has no art. */
     artwork(size: number): Promise<Uint8Array | null>;
+    /** Toggle shuffle on the active player. */
+    shuffle(): Promise<void>;
+    /** Cycle repeat off → all → one → off. */
+    repeat(): Promise<void>;
+    /** Jump to `pos` seconds into the current track. */
+    seek(pos: number): Promise<void>;
+    /** Player volume 0–100. */
+    volume(v: number): Promise<void>;
   };
   notify(title: string, body: string): Promise<void>;
   /** A quiet "needs you" sound. */

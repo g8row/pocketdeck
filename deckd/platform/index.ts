@@ -6,5 +6,5 @@ import { darwin } from "./darwin.ts";
 import { linux } from "./linux.ts";
 import type { Host } from "./types.ts";
 
-export type { Host, HostState } from "./types.ts";
+export type { Host, HostState, MemInfo, ScreenState } from "./types.ts";
 export const host: Host = process.platform === "darwin" ? darwin : linux;

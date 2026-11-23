@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { mkdtempSync, writeFileSync, appendFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defaultConfig, layoutState, loadConfig, normalizeConfig, saveConfig } from "../deckconfig.ts";
+import { defaultConfig, layoutState, loadConfig, migratePanes, normalizeConfig, saveConfig } from "../deckconfig.ts";
 import { actionArgv, runAction } from "../runner.ts";
 import { __resetSessions, claudeState, onHookEvent, permissionDecided, summarizeTool, toolName, onAlert } from "../providers/claude.ts";
 import { decideById, hold, hookResponse, currentPending, dropSession } from "../gate.ts";
@@ -16,11 +16,12 @@ describe("desk config", () => {
   test("defaults mirror config.ts tiles as builtin actions", () => {
     const d = defaultConfig();
     expect(d.tiles.find((t) => t.id === "mic.toggle")?.action).toEqual({ type: "builtin", id: "mic.toggle" });
-    expect(d.panes[0]).toBe("home");
+    expect(d.panes).toEqual(["board", "deck", "claude", "usage", "music", "settings"]);
   });
   test("normalize drops junk field by field", () => {
     const c = normalizeConfig({
-      panes: ["claude", "nope", "claude", "home"],
+      version: 2,
+      panes: ["claude", "nope", "claude", "board"],
       accent: "red",
       tiles: [
         { label: "Build", color: "violet", action: { type: "shell", cmd: "make" } },
@@ -31,7 +32,7 @@ describe("desk config", () => {
       ],
       claude: { approvalTimeoutSec: 999, sound: "yes" },
     });
-    expect(c.panes).toEqual(["claude", "home"]);
+    expect(c.panes).toEqual(["claude", "board"]);
     expect(c.accent).toBe(defaultConfig().accent);
     expect(c.tiles.map((t) => [t.id, t.color])).toEqual([
       ["build", "violet"],
@@ -73,6 +74,27 @@ describe("desk config", () => {
     const r = loadConfig(p);
     expect(r.error).toBeTruthy();
     expect(r.config.panes).toEqual(defaultConfig().panes);
+  });
+  test("pre-redesign pane ids migrate: home → board, pulse/focus/system dropped, usage + settings added", () => {
+    const old = ["home", "claude", "deck", "music", "board", "system", "pulse", "focus"];
+    expect(migratePanes(old)).toEqual(["board", "claude", "usage", "deck", "music", "settings"]);
+    expect(migratePanes(["home", "system"], 1)).toEqual(["board", "usage", "settings"]);
+    expect(migratePanes(["music", "pulse"])).toEqual(["usage", "music", "settings"]);
+    // only dropped ids: nothing left → normalize falls back to the defaults
+    expect(normalizeConfig({ version: 1, panes: ["pulse", "focus"] }).panes).toEqual(defaultConfig().panes);
+    // a current config is taken as is: a pane the user switched off stays off
+    expect(migratePanes(["board", "music"], 2)).toEqual(["board", "music"]);
+    expect(normalizeConfig({ version: 2, panes: ["deck", "home", "music"] }).panes).toEqual(["deck", "board", "music"]);
+  });
+  test("an old saved file loads migrated and saves as version 2", () => {
+    const p = join(tmp(), "deck.config.json");
+    writeFileSync(p, JSON.stringify({ version: 1, panes: ["home", "claude", "deck", "music", "board", "system"] }));
+    const c = loadConfig(p).config;
+    expect(c.version).toBe(2);
+    expect(c.panes).toEqual(["board", "claude", "usage", "deck", "music", "settings"]);
+    saveConfig(c, p);
+    expect(JSON.parse(readFileSync(p, "utf8")).version).toBe(2);
+    expect(loadConfig(p).config.panes).toEqual(c.panes);
   });
   test("layout state carries what the tablet needs", () => {
     expect(Object.keys(layoutState(defaultConfig())).sort()).toEqual(["accent", "approvals", "flash", "panes"]);

@@ -25,13 +25,14 @@ bun test           # unit tests (protocol, config, runner, gate, transcript, usa
 | Key | Source | Interval |
 |---|---|---|
 | `clock` | local time | 1 s |
-| `sys` | host CPU and memory (`vm_stat` / `/proc/meminfo`) | 2 s |
-| `music` + art blob | macOS: Apple Music via AppleScript. Linux: any MPRIS player (`busctl`), art scaled with ImageMagick. Pushed as an RGBA blob | 1 s |
+| `host` | `{ os, name, screen }`: OS, hostname, and `active` / `locked` / `asleep` (Linux: logind `LockedHint`, DRM connector DPMS; macOS: `ioreg`) | 2 s |
+| `sys` | host CPU and memory (`vm_stat` / `/proc/meminfo`), cores, GHz, GB, and `hist.{cpu,mem}.{1m,10m,1h}` (30 points: 2 s samples, 20 s and 2 min means; kept in memory, empty after a restart) | 2 s |
+| `music` + art blob | macOS: Apple Music via AppleScript. Linux: any MPRIS player (`busctl`), art scaled with ImageMagick. Pushed as an RGBA blob. Also `player`, `shuffle`, `repeat`, `volume`; actions `music.shuffle`, `music.repeat`, `music.seek {pos}`, `music.volume {v}` | 1 s |
 | `deck` | tiles + live subtitles from `config.ts` / `deck.config.json` | 5 s |
 | `claude` | hook events + transcript tail (`providers/transcript.ts`): model, tokens, context, tool timeline | 1–3 s |
-| `usage` | today's Claude usage from `~/.claude/projects/**/*.jsonl` | 30 s |
+| `usage` | Claude usage from `~/.claude/projects/**/*.jsonl`: today by hour, `days[7]` and `projects7d` | 30 s |
 | `focus` | the focus timer (state lives in deckd) | 1 s |
-| `tablet` | battery, free RAM, CPU clock, uptime via `adb shell` or the ssh connection | 30 s |
+| `tablet` | battery (with temperature, voltage, current), free RAM, CPU clock, uptime via `adb shell` or the ssh connection | 30 s |
 
 ## Linux
 

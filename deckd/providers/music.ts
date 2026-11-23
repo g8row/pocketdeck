@@ -14,28 +14,43 @@ export interface MusicState {
   position?: number;
   duration?: number;
   trackId?: string;
+  /** Short lowercase player name: "spotify", "firefox", "music". */
+  player?: string;
+  shuffle?: boolean;
+  repeat?: "off" | "all" | "one";
+  /** Player volume 0–100. */
+  volume?: number;
 }
 
 const SEP = "\u001f";
+// Shuffle / repeat / volume are app properties, sent in every state (also stopped).
+// UNTESTED on a Mac (written on Linux): `song repeat` is off / one / all, `sound volume` 0–100.
 export const READ = `
 if application "Music" is running then
   tell application "Music"
     set ps to player state as text
-    if ps is "stopped" then return "stopped"
+    set md to (shuffle enabled as text) & "${SEP}" & (song repeat as text) & "${SEP}" & (sound volume as text)
+    if ps is "stopped" then return "stopped" & "${SEP}" & md
     set t to current track
-    return ps & "${SEP}" & (name of t) & "${SEP}" & (artist of t) & "${SEP}" & (album of t) & "${SEP}" & (player position as text) & "${SEP}" & (duration of t as text) & "${SEP}" & (persistent ID of t)
+    return ps & "${SEP}" & md & "${SEP}" & (name of t) & "${SEP}" & (artist of t) & "${SEP}" & (album of t) & "${SEP}" & (player position as text) & "${SEP}" & (duration of t as text) & "${SEP}" & (persistent ID of t)
   end tell
 else
   return "off"
 end if`;
 
-export async function readMusic(): Promise<MusicState> {
-  const r = await $`osascript -e ${READ}`.quiet().nothrow();
-  const out = r.stdout.toString().trim();
-  if (r.exitCode !== 0 || out === "" || out === "off") return { state: "off" };
-  if (out === "stopped") return { state: "stopped" };
-  const [st, title, artist, album, pos, dur, id] = out.split(SEP);
+/** READ's output → MusicState (pure; unit-tested). */
+export function parseMusicOut(out: string): MusicState {
+  out = out.trim();
+  if (out === "" || out === "off") return { state: "off" };
+  const [st, shuf, rep, vol, title, artist, album, pos, dur, id] = out.split(SEP);
   const num = (s?: string) => Number((s ?? "0").replace(",", ".")) || 0;
+  const modes = {
+    player: "music",
+    shuffle: shuf === "true",
+    repeat: rep === "one" || rep === "all" ? rep : ("off" as const),
+    volume: Math.max(0, Math.min(100, Math.round(num(vol)))),
+  };
+  if (st === "stopped") return { state: "stopped", ...modes };
   return {
     state: st === "playing" ? "playing" : "paused",
     title,
@@ -43,9 +58,38 @@ export async function readMusic(): Promise<MusicState> {
     album,
     position: Math.round(num(pos)),
     duration: Math.round(num(dur)),
+    ...modes,
     trackId: id,
   };
 }
+
+export async function readMusic(): Promise<MusicState> {
+  const r = await $`osascript -e ${READ}`.quiet().nothrow();
+  if (r.exitCode !== 0) return { state: "off" };
+  return parseMusicOut(r.stdout.toString());
+}
+
+// Controls (UNTESTED on a Mac). Each only talks to Music when it is already running.
+const ifRunning = (body: string) => `if application "Music" is running then
+  tell application "Music"
+${body}
+  end tell
+end if`;
+export const SHUFFLE = ifRunning("    set shuffle enabled to not shuffle enabled");
+export const REPEAT = ifRunning(`    if song repeat is off then
+      set song repeat to all
+    else if song repeat is all then
+      set song repeat to one
+    else
+      set song repeat to off
+    end if`);
+const osaRun = (script: string) => $`osascript -e ${script}`.quiet().nothrow();
+export const musicControls = {
+  shuffle: async () => void (await osaRun(SHUFFLE)),
+  repeat: async () => void (await osaRun(REPEAT)),
+  seek: async (pos: number) => void (await osaRun(ifRunning(`    set player position to ${Math.max(0, Math.round(pos))}`))),
+  volume: async (v: number) => void (await osaRun(ifRunning(`    set sound volume to ${Math.max(0, Math.min(100, Math.round(v)))}`))),
+};
 
 /** Export the current track's artwork as 128×128 RGBA, or null if it has none. */
 export async function readArtwork(size = 128): Promise<Uint8Array | null> {

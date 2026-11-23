@@ -1,6 +1,7 @@
-// Today's Claude Code usage, from the local transcripts: every
-// ~/.claude/projects/*/*.jsonl touched today is tailed incrementally and its
-// assistant messages are bucketed by local hour. No network, no API keys.
+// Claude Code usage, from the local transcripts: every ~/.claude/projects/*/*.jsonl
+// touched in the last 7 days is tailed incrementally. Today's assistant messages are
+// bucketed by local hour (`Day`); every message also lands in a per-day total for the
+// 7-day view (`Week`). No network, no API keys.
 
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -10,7 +11,6 @@ const ROOT = process.env.CLAUDE_PROJECTS ?? join(process.env.HOME ?? "", ".claud
 
 interface Day {
   key: string; // yyyy-mm-dd local
-  tails: Map<string, TranscriptTail>;
   hourOut: number[]; // output tokens per hour
   hourMsgs: number[];
   input: number;
@@ -31,7 +31,6 @@ const dayKey = (t: number) => {
 function newDay(key: string): Day {
   return {
     key,
-    tails: new Map(),
     hourOut: new Array(24).fill(0),
     hourMsgs: new Array(24).fill(0),
     input: 0,
@@ -46,6 +45,74 @@ function newDay(key: string): Day {
   };
 }
 let day = newDay(dayKey(Date.now()));
+
+// ---- the last 7 days ------------------------------------------------------------------
+
+export const WEEK_DAYS = 7;
+interface DayTotal {
+  out: number;
+  projects: Map<string, number>;
+  seen: Set<string>;
+}
+/** dayKey → that day's output tokens, overall and per project. */
+export type Week = Map<string, DayTotal>;
+export const newWeek = (): Week => new Map();
+let week = newWeek();
+
+/** Local midnight `n` days before `now`'s. */
+const dayStart = (now: number, n = 0) => {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - n);
+  return d.getTime();
+};
+
+/** Fold one assistant entry into the week, deduped per message id (exported for tests). */
+export function addWeekEntry(w: Week, e: AssistantEntry, project: string): void {
+  if (!e.at) return;
+  const key = dayKey(e.at);
+  let t = w.get(key);
+  if (!t) w.set(key, (t = { out: 0, projects: new Map(), seen: new Set() }));
+  if (t.seen.has(e.id)) return;
+  t.seen.add(e.id);
+  t.out += e.usage.output;
+  t.projects.set(project, (t.projects.get(project) ?? 0) + e.usage.output);
+}
+
+/** Drop days that fell out of the window. */
+function pruneWeek(w: Week, now: number) {
+  const keep = new Set(Array.from({ length: WEEK_DAYS }, (_, i) => dayKey(dayStart(now, i))));
+  for (const k of w.keys()) if (!keep.has(k)) w.delete(k);
+}
+
+const DOW = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const MAX_PROJECTS = 12;
+
+/** { name, out "12.3k", pct share of the total } sorted by output, largest first. */
+function projectList(m: Map<string, number>) {
+  const total = [...m.values()].reduce((a, b) => a + b, 0);
+  return [...m.entries()]
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MAX_PROJECTS)
+    .map(([name, v]) => ({ name, out: kfmt(v), pct: total > 0 ? Math.round((v / total) * 100) : 0 }));
+}
+
+/** days[7] (oldest first, today last) and projects7d (exported for tests). */
+export function weekState(w: Week, now = Date.now()) {
+  const days = [];
+  const projects = new Map<string, number>();
+  for (let i = WEEK_DAYS - 1; i >= 0; i--) {
+    const start = dayStart(now, i);
+    const t = w.get(dayKey(start));
+    days.push({ d: DOW[new Date(start).getDay()]!, out: t?.out ?? 0 });
+    for (const [p, v] of t?.projects ?? []) projects.set(p, (projects.get(p) ?? 0) + v);
+  }
+  return { days, projects7d: projectList(projects) };
+}
+
+/** Every transcript tailed (path → tail), kept across midnight so nothing is read twice. */
+const tails = new Map<string, TranscriptTail>();
 
 /** Fold one assistant entry into the day (exported for tests). */
 export function addEntry(d: Day, e: AssistantEntry, project: string): void {
@@ -82,13 +149,15 @@ export function projectName(dir: string): string {
 export async function scanUsage(now = Date.now()): Promise<void> {
   const key = dayKey(now);
   if (key !== day.key) day = newDay(key);
-  const startOfDay = new Date(now).setHours(0, 0, 0, 0);
+  pruneWeek(week, now);
+  const since = dayStart(now, WEEK_DAYS - 1);
   let dirs: string[] = [];
   try {
     dirs = readdirSync(ROOT);
   } catch {
     return;
   }
+  const live = new Set<string>();
   for (const dir of dirs) {
     let files: string[] = [];
     try {
@@ -96,22 +165,31 @@ export async function scanUsage(now = Date.now()): Promise<void> {
     } catch {
       continue;
     }
+    const project = projectName(dir);
     for (const f of files) {
       const path = join(ROOT, dir, f);
-      let tail = day.tails.get(path);
-      if (!tail) {
-        try {
-          if (statSync(path).mtimeMs < startOfDay) continue;
-        } catch {
-          continue;
-        }
-        tail = new TranscriptTail(path);
-        day.tails.set(path, tail);
+      try {
+        if (statSync(path).mtimeMs < since) continue;
+      } catch {
+        continue;
       }
-      const project = projectName(dir);
-      await tail.poll((e) => addEntry(day, e, project)).catch(() => false);
+      live.add(path);
+      let tail = tails.get(path);
+      if (!tail) {
+        tail = new TranscriptTail(path);
+        tails.set(path, tail);
+      }
+      await tail
+        .poll((e) => {
+          addEntry(day, e, project);
+          addWeekEntry(week, e, project);
+        })
+        .catch(() => false);
     }
   }
+  // transcripts untouched for a week (or deleted) are done with
+  for (const p of tails.keys()) if (!live.has(p)) tails.delete(p);
+  pruneWeek(week, now);
 }
 
 const kfmt = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}m` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : `${n}`);
@@ -119,8 +197,6 @@ const kfmt = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}m` : n >= 1e3 ? 
 export function usageState(now = Date.now()) {
   const d = day;
   const peak = Math.max(1, ...d.hourOut);
-  const projects = [...d.projects.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  const pmax = Math.max(1, ...projects.map((p) => p[1]));
   return {
     hour: new Date(now).getHours(),
     /** 0..8 per hour, for ASCII bars */
@@ -133,7 +209,9 @@ export function usageState(now = Date.now()) {
     sessions: d.sessions.size,
     /** output tokens in the last 60 minutes (rough "rate") */
     lastHour: kfmt(d.hourOut[new Date(now).getHours()]!),
-    projects: projects.map(([name, v]) => ({ name, out: kfmt(v), pct: Math.round((v / pmax) * 100) })),
+    /** pct = share of today's output (the page sums them for "+N more") */
+    projects: projectList(d.projects),
     model: [...d.models.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]?.replace(/^claude-/, "") ?? "",
+    ...weekState(week, now),
   };
 }
