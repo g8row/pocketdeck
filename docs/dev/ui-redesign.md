@@ -61,7 +61,7 @@ Contract: `pocketjs/apps/desk/device.ts` header. Mount a `device` global the way
   `reboot {target}` → `tb-reboot <target>` (detached), `poweroff`, `restart-ui` → detached
   `rc-service pocketdeck-ui restart`, `brightness {value}` → sysfs write, `wifi {on}` → `wifi-up join` / `wifi-up off`
   (async), `charge-limit {on}` → SM5414 constant charge voltage 4.10 V / 4.35 V, `dim-follow-host {on}` → persist,
-  `touch-filters {paused}` → a shared flag the `Touch` filter code in `src/kiosk.rs` honours, with a 30 s safety
+  `touch-filters {paused}` → a shared flag the `Touch` filter code in `src/kiosk.rs` honours, with a 60 s safety
   timeout that unpauses on its own.
 - Persist settings (`dimFollowHost`, `chargeLimit`, last brightness) in `/data/pocketdeck/settings.json`; apply them
   at start.
