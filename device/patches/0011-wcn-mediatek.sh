@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install the MediaTek CONSYS WiFi/BT driver (mainline/wcn, see wcn/README.md) as drivers/misc/mediatek in the
+# Install the MediaTek CONSYS WiFi/BT driver (device/wcn, see wcn/README.md) as drivers/misc/mediatek in the
 # kernel tree in $1 and hook it into drivers/misc. Idempotent: the copy is replaced on every run.
 set -e
 K=$1; M=$(dirname "$0")/..

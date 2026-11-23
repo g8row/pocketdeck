@@ -1,14 +1,14 @@
 #!/bin/sh
-# Build the TB-7304X stage-2 root filesystem: Alpine aarch64 as an ext4 image (docs/mainline/research-rootfs.md).
+# Build the TB-7304X stage-2 root filesystem: Alpine aarch64 as an ext4 image (docs/hardware/research-rootfs.md).
 # Runs on any x86_64 or arm64 Docker host, no qemu: apk installs the aarch64 packages with --no-scripts and this
 # script does what their install scripts would have done.
 #
-#   sh mainline/rootfs/build-rootfs.sh <ssh-public-key> [out-dir]     -> out-dir/rootfs.img (+ .sha256)
+#   sh device/rootfs/build-rootfs.sh <ssh-public-key> [out-dir]     -> out-dir/rootfs.img (+ .sha256)
 #
-# Contents: Alpine + PKGS, the overlay, the tools from mainline/out (scripts/build.sh: tbstate, peek, poke, swipe,
+# Contents: Alpine + PKGS, the overlay, the tools from device/out (device/build/build.sh: tbstate, peek, poke, swipe,
 # bbdeb/devmem, wmt_loader, stp_uart_launcher) and, when present, Mesa (MESA=, default gpu/out/mesa-opt.tar.gz).
-# Not in the image: the WiFi firmware/NVRAM (proprietary, per device: scripts/wifi-deploy.sh), PocketJS
-# (scripts/pocketjs-deploy.sh), saved WiFi networks (/data/wifi). Install: scripts/rootfs-install.sh.
+# Not in the image: the WiFi firmware/NVRAM (proprietary, per device: tools/wifi-deploy.sh), PocketJS
+# (tools/pocketjs-deploy.sh), saved WiFi networks (/data/wifi). Install: tools/tb-install.sh rootfs.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 KEY=${1:?usage: build-rootfs.sh <ssh-public-key> [out-dir]}
@@ -20,7 +20,7 @@ ALPINE=3.24 V=3.24.4 SIZE=${SIZE:-512M}
 PKGS="alpine-base busybox-extras dropbear dropbear-scp e2fsprogs e2fsprogs-extra nano htop evtest i2c-tools curl gdb musl-utils"
 PKGS="$PKGS libdrm expat zstd-libs zlib iw wpa_supplicant"
 TOOLS="tbstate peek poke swipe wmt_loader stp_uart_launcher bbdeb"
-for t in $TOOLS; do [ -x "$BIN/$t" ] || { echo "missing $BIN/$t (run mainline/scripts/build.sh)"; exit 1; }; done
+for t in $TOOLS; do [ -x "$BIN/$t" ] || { echo "missing $BIN/$t (run device/build/build.sh)"; exit 1; }; done
 mkdir -p "$OUT/tools" && for t in $TOOLS; do cp "$BIN/$t" "$OUT/tools/"; done
 if [ -f "$MESA" ]; then cp "$MESA" "$OUT/mesa-opt.tar.gz"; else echo "note: no $MESA, image without /opt/mesa"; rm -f "$OUT/mesa-opt.tar.gz"; fi
 cp "$KEY" "$OUT/authorized_keys"

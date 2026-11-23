@@ -4,16 +4,16 @@ Status (2026-11-19): **mainline 7.0.10 is the tablet's main system.** U-Boot in 
 internal eMMC (kernel slot `tbkern_a`, root `tbroot_a`) by default; Android + Magisk stay in `recovery`.
 Display (mediatek-drm, 60 Hz), touch, buttons, all 4 CPU cores, eMMC, USB, WiFi, charger/battery/RTC/thermal,
 accelerometer, IOMMU and the PocketJS kiosk work. Current support, measurements and the ordered todo list:
-[docs/mainline/STATUS.md](../docs/mainline/STATUS.md).
+[docs/hardware/status.md](../docs/hardware/status.md).
 
 > Section 0 below is the **2026-11-16 bring-up record**, not the current hardware status. The live layout is
 > U-Boot in `boot`, Android in `recovery`, and Linux by default from the raw slots
-> ([plan-dualboot.md](../docs/mainline/plan-dualboot.md)). Anything LK boots directly must pass
-> `scripts/analysis/lk_image_check.py` ([research-lk-bootflow.md](../docs/mainline/research-lk-bootflow.md) §4).
+> ([plan-dualboot.md](../docs/architecture/boot-chain.md)). Anything LK boots directly must pass
+> `device/analysis/lk_image_check.py` ([research-lk-bootflow.md](../docs/hardware/research-lk-bootflow.md) §4).
 
 ## 0. Bring-up results (2026-11-16)
 
-> Historical snapshot. For the current state see [docs/mainline/STATUS.md](../docs/mainline/STATUS.md).
+> Historical snapshot. For the current state see [docs/hardware/status.md](../docs/hardware/status.md).
 
 | Area | State | Notes |
 |---|---|---|
@@ -30,11 +30,11 @@ accelerometer, IOMMU and the PocketJS kiosk work. Current support, measurements 
 
 ### Boot and tooling findings
 - LK's fastboot has no `boot`, and the stock `fastboot` tool stalls in the `download:` data phase.
-  `scripts/analysis/fb_send.py` (pyusb, 1 MiB bulk writes) uploads reliably. Usage: `fb_send.py <file> <cmd>`,
+  `device/analysis/fb_send.py` (pyusb, 1 MiB bulk writes) uploads reliably. Usage: `fb_send.py <file> <cmd>`,
   or `fb_send.py - "<cmd>"` to send a command only.
 - **LK keeps only 99 characters** of the boot image's cmdline. `build-in-docker.sh` fails the build if ours is longer.
   LK prepends its own items (including `console=tty0`).
-- `scripts/mlsh.py` is a telnet shell to the tablet. `mlsh.py wait` waits for the gadget and touches `/tmp/stay`
+- `tools/mlsh.py` is a telnet shell to the tablet. `mlsh.py wait` waits for the gadget and touches `/tmp/stay`
   (this cancels the 300 s auto-reboot). On the host, use a dedicated NetworkManager profile for the tablet's `enx*`
   interface, with 172.16.42.2/24 and `never-default`. **Never run `nmcli d connect`**: it can move the host's main
   wired profile onto the tablet link.
@@ -72,7 +72,7 @@ accelerometer, IOMMU and the PocketJS kiosk work. Current support, measurements 
 
 ## TL;DR (2026-11-16 research snapshot)
 
-> For the current system see [docs/mainline/STATUS.md](../docs/mainline/STATUS.md); these were the findings that
+> For the current system see [docs/hardware/status.md](../docs/hardware/status.md); these were the findings that
 > started the bring-up.
 
 - A working MT6735-family mainline kernel exists: **gitlab.com/mt6735-mainline/linux**, 7.0.10, the same one postmarketOS
@@ -80,7 +80,7 @@ accelerometer, IOMMU and the PocketJS kiosk work. Current support, measurements 
 - **Stock LK has no `fastboot boot` command** (found by disassembly, details below). A RAM-only test through LK fastboot
   was therefore expected to fail. At the time the fallback was flashing the **recovery** partition (backed up) and
   running `fastboot oem reboot-recovery`. The chainloaded U-Boot now provides `fastboot boot`; see
-  [plan-dualboot.md](../docs/mainline/plan-dualboot.md).
+  [plan-dualboot.md](../docs/architecture/boot-chain.md).
 - Built: `out/boot-mainline.img` (mainline + new DTS + sign-of-life initramfs), `out/boot-mainline-noovl.img`
   (safer framebuffer probing), and `out/boot-stock-kernel-initramfs.img` (control: stock 3.18 kernel + same initramfs).
   All use the stock header layout, which we verified by re-packing the stock `boot.bin` byte-for-byte.
@@ -124,7 +124,7 @@ accelerometer, IOMMU and the PocketJS kiosk work. Current support, measurements 
 - Similar tablets: no mainline port for any Lenovo MT6735/MT6737 tablet was found. The closest base is the Doogee X5 Pro DTS.
 
 ### Stock LK (bootloader) — from disassembling `backup/partitions/lk.bin`
-The analysis scripts are in `scripts/analysis/`. The LK image has a 0x200-byte MTK header. Code is ARM32/Thumb-2,
+The analysis scripts are in `device/analysis/`. The LK image has a 0x200-byte MTK header. Code is ARM32/Thumb-2,
 linked at 0x41E00000 (taken from the reset-vector literals), position-independent (`ldr rX,[pc]; add rX,pc`).
 Fastboot product string: `HQ8735B_TB_N`.
 - **Fastboot commands registered** (one function at 0x41e20dfe..0x41e20f82):
@@ -132,7 +132,7 @@ Fastboot product string: `HQ8735B_TB_N`.
   - `oem p2u`, `oem reboot-recovery`, `oem append-cmdline`, `oem off-mode-charge`
   - The string `boot` exists only as the tail of `fastboot`. It is used elsewhere as a partition name, never in that
     function. **Conclusion: LK has no `fastboot boot`** (it answers "unknown command"). Our chainloaded U-Boot does
-    provide it; see [plan-dualboot.md](../docs/mainline/plan-dualboot.md).
+    provide it; see [plan-dualboot.md](../docs/architecture/boot-chain.md).
 - Kernel loading (function around 0x41e1f480):
   - It checks `hdr->kernel_addr & 0x7FFFF == 0`; otherwise "64 bit kernel can't boot at …".
   - It finds the DTB by **scanning backwards from the end of the kernel blob for `d0 0d fe ed`**, so an appended DTB
@@ -199,13 +199,13 @@ Fastboot product string: `HQ8735B_TB_N`.
 | `patches/0001-soc-mediatek-mtk-lk-fb.sh` | Idempotently adds the driver and DTS to the kernel tree (Kconfig, Makefile, dts Makefile). |
 | `patches/0002-memory-mtk-smi-skip-larb-port-config-without-iommu.patch` | Fixes a NULL dereference in `mtk_smi_larb_resume` when no IOMMU is bound. |
 | `patches/0003-arm64-mt6735-smp.sh`, `patches/smp_mt6735.c` | The `mediatek,mt6735-smp` enable-method: PSCI CPU_ON plus the SPM power-on. |
-| `scripts/analysis/fb_send.py`, `scripts/mlsh.py` | pyusb fastboot client (upload, flash, oem); telnet shell to the running tablet. |
+| `device/analysis/fb_send.py`, `tools/mlsh.py` | pyusb fastboot client (upload, flash, oem); telnet shell to the running tablet. |
 | `patches/config-tb7304x.fragment` | Appended to the pmOS config. See below. |
 | `initramfs/init`, `initramfs/lkpaint.c` | Busybox init and a static screen-fill tool. Work on both mainline and the stock 3.18 kernel. See below. |
-| `scripts/Dockerfile`, `scripts/build.sh`, `scripts/build-in-docker.sh` | Reproducible build (OrbStack/Docker, Debian trixie arm64, native gcc 14.2, Debian `mkbootimg` 34.0.5, busybox-static 1.37.0). |
-| `scripts/analysis/*.py` | LK disassembly helpers: string references and Thumb disassembly with string annotation. |
+| `device/build/Dockerfile`, `device/build/build.sh`, `device/build/build-in-docker.sh` | Reproducible build (OrbStack/Docker, Debian trixie arm64, native gcc 14.2, Debian `mkbootimg` 34.0.5, busybox-static 1.37.0). |
+| `device/analysis/*.py` | LK disassembly helpers: string references and Thumb disassembly with string annotation. |
 | `stock/` | Stock kernel, `Image`, `stock.dtb`/`stock.dts`, `lk.strings` (all extracted from backups). |
-| `wcn/`, `patches/0011-wcn-mediatek.sh` | MediaTek CONSYS WiFi driver (WMT/STP/BTIF + wlan_gen2), copied into the kernel as `drivers/misc/mediatek`. Origin in `wcn/README.md`, bring-up in docs/mainline/research-wifi.md. |
+| `wcn/`, `patches/0011-wcn-mediatek.sh` | MediaTek CONSYS WiFi driver (WMT/STP/BTIF + wlan_gen2), copied into the kernel as `drivers/misc/mediatek`. Origin in `wcn/README.md`, bring-up in docs/hardware/research-wifi.md. |
 | `wcn-tools/` | `wmt_loader`, `stp_uart_launcher` (built static into `out/`). |
 | `rootfs/overlay/usr/local/sbin/wifi-up` | On the tablet: radio on, optional join + DHCP, `wifi-up off`. |
 | `out/` | Build outputs plus `SHA256SUMS`, `kernel.config`, `kernel-build.log`, LK disassembly excerpts. |
@@ -301,7 +301,7 @@ one). Both verified 2026-11-17. The stock partition backups must be in `../backu
 ## 4. Next steps
 Linux boots by default through the chainloaded U-Boot, and display, rootfs, cpufreq, GPU, WiFi and the PocketJS
 kiosk are working. The live status table, measurements and the ordered todo list are in
-[`docs/mainline/STATUS.md`](../docs/mainline/STATUS.md). Next: Bluetooth, the OVL0 hardware-plane path, and an
+[`docs/hardware/status.md`](../docs/hardware/status.md). Next: Bluetooth, the OVL0 hardware-plane path, and an
 updater for the inactive Linux slot.
 
 ## Sources

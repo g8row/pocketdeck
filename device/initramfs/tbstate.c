@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * tbstate: read/write the TB-7304X boot record from Linux (stage 1 and 2) and from Android (root).
- * Format and location: mainline/u-boot/tbstate.h; design: docs/mainline/plan-dualboot.md §4.
+ * Format and location: device/u-boot/tbstate.h; design: docs/architecture/boot-chain.md §4.
  *
  *   tbstate [show]                 print the record as key=value lines (state=ok|blank|corrupt first)
  *   tbstate set key=value ...      default=linux|android  oneshot=none|linux|android|fastboot  attempts=<n>
@@ -13,7 +13,7 @@
  * The partition is found by GPT name in /sys/class/block (works in the initramfs, Alpine and Android). Writes
  * go over the older copy with O_DIRECT|O_SYNC and are read back. Nothing is written unless the partition is the
  * 1 MiB `tbstate` one (TBS_PART_MIN/MAX_SECTORS), and only the two record sectors are ever written.
- * Static build, no libc extras: aarch64-linux-gnu-gcc -static -O2 -I mainline/u-boot -o tbstate tbstate.c
+ * Static build, no libc extras: aarch64-linux-gnu-gcc -static -O2 -I device/u-boot -o tbstate tbstate.c
  */
 #define _GNU_SOURCE
 #include <dirent.h>

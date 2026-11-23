@@ -40,7 +40,7 @@ export async function keepAdbReverse(port: number, log: Log): Promise<void> {
 const SSH_TARGET = process.env.DESKD_SSH ?? "root@172.16.42.1";
 const sshEnabled = SSH_TARGET !== "off" && SSH_TARGET !== "" && !!Bun.which("ssh");
 const CONTROL = join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `deskd-ssh-${process.getuid?.() ?? 0}.sock`);
-// the tablet is reflashed often: don't pin its host key (same as mainline/scripts/tb.sh)
+// the tablet is reflashed often: don't pin its host key (same as tools/tb.sh)
 const SSH_OPTS = [
   "-o", "BatchMode=yes",
   "-o", "ConnectTimeout=4",
@@ -245,7 +245,7 @@ export function encodePng(rgb: Uint8Array, w: number, h: number): Uint8Array {
 
 /** XRGB8888 (BGRA bytes) framebuffer → PNG. A portrait panel (the TB-7304X is
  *  600×1024) is turned to landscape the way the kiosk draws on it: output row =
- *  panel column, right to left (same as mainline/scripts/fb2png.py). */
+ *  panel column, right to left (same as tools/fb2png.py). */
 export function fbToPng(fb: Uint8Array, w: number, h: number, stride: number): Uint8Array | null {
   if (fb.length < h * stride) return null;
   const rotate = h > w;

@@ -3,7 +3,7 @@
 #  - 60 s after reaching userspace the boot counts as good: bootcount (stage 1 gives up on the rootfs after 2 bad
 #    ones) and the boot record (`tbstate healthy`: U-Boot boots Android after 3 unhealthy Linux boots).
 #  - Optional timed return to Android: tb.autoreboot=<s> on the cmdline or a number in /etc/tb-autoreboot.
-#    Default 0 (off): Linux is the default OS since U-Boot sits in `boot` (docs/mainline/plan-dualboot.md).
+#    Default 0 (off): Linux is the default OS since U-Boot sits in `boot` (docs/architecture/boot-chain.md).
 #    /tmp/stay or /run/stay pauses it. The reboot sets LK's one-shot RTC recovery flag (Android in `recovery`);
 #    a plain reboot would come back to Linux. sysrq s,u,b because `reboot -f` can hang on this kernel.
 T=0

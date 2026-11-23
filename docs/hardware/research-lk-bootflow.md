@@ -3,7 +3,7 @@
 **Date:** 2026-11-17. **Input:** `backup/partitions/lk.bin` (MTK LK, "Build time: Aug 28 2018 19:30:47", Thumb-2,
 linked at `0x41E00000`, 0x200-byte MTK header). **Method:** full capstone disassembly with string and literal
 annotation, function by function along the boot path; an offline model of LK's image checks
-([`lk_image_check.py`](../../mainline/scripts/analysis/lk_image_check.py)); the session log of the 2026-11-16 tests.
+([`lk_image_check.py`](../../device/analysis/lk_image_check.py)); the session log of the 2026-11-16 tests.
 **Read with:** [plan-dualboot.md](plan-dualboot.md) (the decided design and live test status),
 [handoff-uboot-2026-11-17.md](handoff-uboot-2026-11-17.md), [plan-boot-recovery.md](../../plan-boot-recovery.md).
 
@@ -234,7 +234,7 @@ within ~10 s. Any LK hang becomes a reset with boot reason `wdt_by_pass_pwk` (au
 Check any image before flashing it:
 
 ```sh
-mainline/scripts/analysis/lk_image_check.py <image-or-partition-dump>...
+device/analysis/lk_image_check.py <image-or-partition-dump>...
 ```
 
 Current results:
@@ -242,12 +242,12 @@ Current results:
 | Image | Result |
 |---|---|
 | `backup/partitions/boot.bin` (stock), `boot-magisk.img` | OK |
-| `mainline/out/boot-mainline.img` (kernel #24 for LK) | OK |
+| `device/out/boot-mainline.img` (kernel #24 for LK) | OK |
 | U-Boot image as built until 2026-11-17 (`bc5937ad…`) | **FAIL**: rule 5 |
 | U-Boot image built by the current `build-uboot.sh` (padded, kernel area 0x80002; deployed in `recovery`, `672f2f9a…`) | OK, FDT found at offset 0x70764 |
-| `mainline/out/boot-mainline-uboot.img` | FAIL (no bootopt, DTB in `second`). Expected: it is for U-Boot only. |
+| `device/out/boot-mainline-uboot.img` | FAIL (no bootopt, DTB in `second`). Expected: it is for U-Boot only. |
 
-`mainline/u-boot/build-uboot.sh` now pads the gzip stream with zeros up to `0x80000 − len(stock.dtb)` (rounded
+`device/u-boot/build-uboot.sh` now pads the gzip stream with zeros up to `0x80000 − len(stock.dtb)` (rounded
 to 4), then appends the DTB. It runs the checker as a build gate: a failing image is renamed `*.REJECTED`.
 
 ---
@@ -423,4 +423,4 @@ every image before writing it.
 | `g_boot_mode`, `boot_state`, `is_64bit`, `g_boot_hdr` | `0x41e58818`, `0x41e58830`, `0x41e6019c`, `0x41e60198` |
 
 Reproduce the disassembly: `tools/venv` has capstone. Disassemble `lk.bin[0x200:0x200+0x57818]` as Thumb at
-`0x41E00000`. `mainline/scripts/analysis/lk_disasm.py` / `lk_strrefs.py` cover ranges and string xrefs.
+`0x41E00000`. `device/analysis/lk_disasm.py` / `lk_strrefs.py` cover ranges and string xrefs.

@@ -6,11 +6,11 @@
 #   fbusb - "oem reboot-recovery"    command only
 #   fbusb - getvar:product
 set -e
-R=$(cd "$(dirname "$0")/../.." && pwd)
+R=$(cd "$(dirname "$0")/.." && pwd)
 V="$R/tools/fbusb-venv"
 if [ ! -x "$V/bin/python" ] || ! "$V/bin/python" -c 'import usb' 2>/dev/null; then
 	python3 -m venv "$V"
 	"$V/bin/pip" install -q pyusb
 fi
 command -v adb >/dev/null && adb kill-server 2>/dev/null || true
-exec "$V/bin/python" -I "$R/mainline/scripts/analysis/fb_send.py" "$@"
+exec "$V/bin/python" -I "$R/device/analysis/fb_send.py" "$@"

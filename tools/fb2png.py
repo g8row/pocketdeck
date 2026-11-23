@@ -1,6 +1,6 @@
 # Turn a raw dump of the TB-7304X framebuffer (600x1024 portrait, XRGB8888 / BGRA bytes) into a landscape PNG,
 # the way the PocketJS kiosk shows it. Standard library only.
-#   mainline/scripts/tb.sh 'cat /dev/fb0' > fb.raw && python3 -I mainline/scripts/fb2png.py fb.raw fb.png
+#   tools/tb.sh 'cat /dev/fb0' > fb.raw && python3 -I tools/fb2png.py fb.raw fb.png
 import struct
 import sys
 import zlib

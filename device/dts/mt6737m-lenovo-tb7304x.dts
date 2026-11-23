@@ -54,7 +54,7 @@
 
 		/*
 		 * Protected by the boot firmware (EMI MPU, set before LK hands over): non-secure writes are dropped and
-		 * reads return 0. Measured on the tablet with scripts/analysis/memtest.c on 2026-11-17: exactly
+		 * reads return 0. Measured on the tablet with device/analysis/memtest.c on 2026-11-17: exactly
 		 * 0x5e700000..0x5fffffff, the same on every boot, everything else in System RAM clean. Without this node
 		 * the page allocator hands these pages out and their contents silently become zeros (busybox crashed
 		 * once a large copy pushed the page cache into it).
@@ -76,7 +76,7 @@
 		};
 
 		/*
-		 * CONSYS EMI window (WMT driver, mainline/wcn). Not the dtsi's 0x7f800000: on this tablet LK keeps
+		 * CONSYS EMI window (WMT driver, device/wcn). Not the dtsi's 0x7f800000: on this tablet LK keeps
 		 * 0x7f000000.. out of the memory node and its framebuffer sits at 0x7f7b0000..0x7fa10000 (600x1024,
 		 * stride 2432), right over it. The base must be 2 MB aligned (stock: alignment 0x200000): at 0x7ef00000
 		 * CONSYS wrote its trace into 0x7eexxxxx, i.e. the remap drops address bit 20, and corrupted the kernel
@@ -140,7 +140,7 @@
 	};
 
 	/*
-	 * WiFi/BT: CONSYS + MT6625L, out-of-tree MediaTek driver (mainline/wcn, patches/0011). Addresses, IRQs and
+	 * WiFi/BT: CONSYS + MT6625L, out-of-tree MediaTek driver (device/wcn, patches/0011). Addresses, IRQs and
 	 * the reg order come from the stock DT; clocks, power domain and supplies are the mainline equivalents of the
 	 * vendor clkmgr/PMIC calls (wcn/connectivity/common/conn_soc/mt6735/mtk_wcn_consys_hw.c).
 	 */
@@ -377,7 +377,7 @@
 
 /*
  * Sensors (stock: MC3433 accelerometer @0x4c, or a BMA2xx @0x18 as second source; SX9310 @0x28 and A96T316 @0x20
- * SAR sensors). No device nodes yet: enabled for i2c-dev probing (docs/mainline/research-power.md).
+ * SAR sensors). No device nodes yet: enabled for i2c-dev probing (docs/hardware/research-power.md).
  */
 &i2c2 {
 	status = "okay";
@@ -435,7 +435,7 @@
 /*
  * D2 MMSYS (MT6735M/MT6737M): unlike the D1 layout in mt6735.dtsi there is an (absent) OVL1 slot at 0x14008000,
  * so every block after OVL0 sits 0x1000 higher and its SPI is one higher. Confirmed on this tablet by reading the
- * registers LK left running (docs/mainline/STATUS.md, "Display step 0"). Node names keep the D1 unit addresses.
+ * registers LK left running (docs/hardware/status.md, "Display step 0"). Node names keep the D1 unit addresses.
  */
 &disp_rdma0 {
 	reg = <0 0x14009000 0 0x1000>;

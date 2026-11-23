@@ -45,8 +45,8 @@ The panes and deck tiles are configured in **Desk Studio**, a small web app that
   - `apps/desk`: the Desk app itself.
 - **[debloat/](debloat/README.md)**: a Magisk module that removes Google, Lenovo and MTK bloat systemlessly and applies a performance profile.
 - **[kiosk/](kiosk/README.md)**: an optional mode that stops the Android framework entirely and draws straight to the framebuffer.
-- **[mainline/](mainline/README.md)**: mainline Linux on MT6737M. It is the tablet's main system; current support,
-  measurements and the ordered todo list are in [docs/mainline/STATUS.md](docs/mainline/STATUS.md).
+- **[device/](device/README.md)**: mainline Linux on MT6737M. It is the tablet's main system; current support,
+  measurements and the ordered todo list are in [docs/hardware/status.md](docs/hardware/status.md).
 - **[docs/ONBOARDING.md](docs/ONBOARDING.md)**: the full setup, from a stock tablet to a working desk.
 - [LOG.md](LOG.md): the build log, with measurements and dead ends. [PLAN-overnight.md](PLAN-overnight.md) is the original plan.
 
@@ -87,7 +87,7 @@ The following work on the real device:
 
 Not done or not verified:
 - Approving permission prompts from the tablet is built (`deskd/hooks/claude-gate.sh`), but the hook is not installed by default.
-- Bluetooth is WIP: the controller powers on, but scans return nothing (see `docs/mainline/STATUS.md`).
+- Bluetooth is WIP: the controller powers on, but scans return nothing (see `docs/hardware/status.md`).
 - The A/B update path for the inactive Linux slot is not written yet; slot B is empty.
 - Audio, camera and modem are not planned.
 

@@ -10,7 +10,7 @@ Status 2026-11-19: **works at boot** from `tbkern_a`: 2.4 GHz scan, WPA2 associa
 - mt6735 mainline power bindings already have `MT6735_POWER_DOMAIN_CONN`; there is no CONSYS node, driver or
   reserved-memory layout in mainline.
 
-## Stock DT (mainline/stock/stock.dts)
+## Stock DT (device/stock/stock.dts)
 | Node | Values |
 |---|---|
 | `consys@18070000` | `mediatek,mt6735m-consys`, `mediatek,mt6735-consys`; reg 0x18070000/0x200 (CONSYS), 0x10212000/0x100, 0x10000000/0x2000 (topckgen), 0x10006000/0x1000 (SPM); IRQs SPI 227 (0xe3) and 225 (0xe1); supplies vcn18, vcn28, vcn33_bt, vcn33_wifi (MT6328 LDOs); pinctrl states for the GPS LNA |
@@ -30,16 +30,16 @@ Status 2026-11-19: **works at boot** from `tbkern_a`: 2.4 GHz scan, WPA2 associa
   the MT6735-specific CONSYS platform layer (`connectivity/common/combo/linux/pub/.../mt6735`?) — to be located.
 
 ## Bring-up (2026-11-17)
-Driver: `mainline/wcn` (frank-w 5.15 tree + `conn_soc/mt6735`, ported to 7.0; history in git), copied into the
+Driver: `device/wcn` (frank-w 5.15 tree + `conn_soc/mt6735`, ported to 7.0; history in git), copied into the
 kernel by `patches/0011-wcn-mediatek.sh`, built in (`CONFIG_MTK_COMBO*`, `MTK_BTIF`, `NL80211_TESTMODE`).
-Userspace: `mainline/wcn-tools` (BPI-R2's `wmt_loader` + `stp_uart_launcher`, static).
+Userspace: `device/wcn-tools` (BPI-R2's `wmt_loader` + `stp_uart_launcher`, static).
 
 Installed (2026-11-17): the kernel in `tbkern_a`, `iw`/`wpa_supplicant`/`wifi-up`/the OpenRC `wifi` service in the
 root image. At boot `wifi` runs `wifi-up join` in the background when `/data/wifi/wpa_supplicant.conf` exists
 (`wifi-up save <ssid> <password>` writes it, hashed PSK only), otherwise just powers the radio. The firmware and NVRAM
 are not in the image (proprietary, per device): `wifi-deploy.sh` once; `tb-install.sh rootfs` carries them over.
 
-Short form: `mainline/scripts/wifi-deploy.sh` on the host (firmware, NVRAM, tools, `wifi-up`, hash-checked), then
+Short form: `tools/wifi-deploy.sh` on the host (firmware, NVRAM, tools, `wifi-up`, hash-checked), then
 `wifi-up <ssid> <password>` on the tablet (`wifi-up off` to stop). `iw` and `wpa_supplicant` from apk.
 
 By hand, on the tablet (files in place: `/etc/firmware/{WMT_SOC.cfg,ROMv2_lm_patch_1_*_hdr.bin,WIFI_RAM_CODE_6735}`,
@@ -119,12 +119,12 @@ the BSP platform layer first, then decide.
   - `bsp/` (maozi-114 3.18.79) has only the build-in adapter stubs; the driver lives out of tree there. Not useful.
 
 ## Next steps
-> These three steps were completed on 2026-11-17; the result is in `mainline/wcn` and `patches/0011`. The list is
+> These three steps were completed on 2026-11-17; the result is in `device/wcn` and `patches/0011`. The list is
 > kept as the original plan.
 
 1. Diff `bsp2` vs `frankw` `conn_soc/` (35 differing files) and `btif/` to separate MT6735 platform code from
    the 3.18 to 5.15 API port.
-2. Import frank-w's tree into `mainline/src/` as an out-of-tree module or patch set, add `conn_soc/mt6735` and
+2. Import frank-w's tree into `device/src/` as an out-of-tree module or patch set, add `conn_soc/mt6735` and
    `hif/ahb/mt6735`, port to 7.0.
 3. DT: `consys`, `btif`, `wifi` nodes and a `reserved-memory` node; check the mainline mt6735 clock IDs for
    `conn`/`bus` and the CONN power domain.

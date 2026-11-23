@@ -6,7 +6,7 @@ Allow about an hour for parts 1–3 and 15 minutes for the rest.
 > **The current system is mainline Linux**, not Android: U-Boot boots Alpine from the internal eMMC by default and
 > Android + Magisk stay in `recovery`. This guide covers the Android setup (rooting, debloat, kiosk) and the
 > rollback path; the Linux bring-up, install and day-to-day flow are in
-> [docs/mainline/STATUS.md](mainline/STATUS.md) and [mainline/README.md](../mainline/README.md).
+> [docs/hardware/status.md](device/STATUS.md) and [device/README.md](../mainline/README.md).
 
 **You need:**
 - a Mac (Apple Silicon or Intel);
@@ -176,8 +176,8 @@ Kiosk mode drops the whole Android framework and frees about 200 MB more RAM. Se
 The power button or `kiosk.sh stop` brings Android back.
 
 > The tablet can also boot **mainline Linux** as its main system, with Android in `recovery`. That path uses the USB
-> network and `ssh` instead of adb; see [mainline/README.md](../mainline/README.md) and
-> [docs/mainline/STATUS.md](mainline/STATUS.md). The rest of this guide describes the Android setup.
+> network and `ssh` instead of adb; see [device/README.md](../mainline/README.md) and
+> [docs/hardware/status.md](device/STATUS.md). The rest of this guide describes the Android setup.
 
 ## Troubleshooting
 
@@ -199,7 +199,7 @@ deskd/            Mac daemon (Bun): main.ts, providers/, config.ts, deskconfig.t
 pocketjs/         submodule, branch android-host: hosts/android (Rust host + kiosk), apps/desk (the UI)
 debloat/          Magisk module + package lists
 kiosk/            kiosk.sh and helpers (on device: /data/local/tmp/kiosk)
-mainline/         mainline Linux (the current default system): DTS, patches, U-Boot, build scripts (images not committed)
+device/         mainline Linux (the current default system): DTS, patches, U-Boot, build scripts (images not committed)
 backup/           package lists only; your partition dump lives here but is git-ignored
 docs/             this guide + screenshots
 ```

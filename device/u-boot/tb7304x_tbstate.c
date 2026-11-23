@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * TB-7304X: the boot record (tbstate.h, docs/mainline/plan-dualboot.md §4) as a U-Boot command for boot.cmd.
+ * TB-7304X: the boot record (tbstate.h, docs/architecture/boot-chain.md §4) as a U-Boot command for boot.cmd.
  *
  *   tbstate load              read both copies, keep the newest valid one, export it to the environment:
  *                             tb_state (ok|blank|corrupt) tb_default tb_oneshot tb_attempts tb_max tb_stage

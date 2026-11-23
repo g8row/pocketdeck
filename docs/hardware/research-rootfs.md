@@ -279,8 +279,8 @@ Optional stage-1 additions:
   busybox-static has both).
 
 ## Sources
-- Repo: `mainline/README.md`, `TEST-PLAN.md`, `initramfs/init`, `scripts/build-in-docker.sh`, `patches/config-tb7304x.fragment`,
-  `out/build5/kernel.config`, `scripts/analysis/fb_send.py`, `backup/partitions/{boot,recovery,lk}.bin` (fstab, init.rc, LK disassembly).
+- Repo: `device/README.md`, `TEST-PLAN.md`, `initramfs/init`, `device/build/build-in-docker.sh`, `patches/config-tb7304x.fragment`,
+  `out/build5/kernel.config`, `device/analysis/fb_send.py`, `backup/partitions/{boot,recovery,lk}.bin` (fstab, init.rc, LK disassembly).
 - Alpine latest-stable aarch64: https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/aarch64/latest-releases.yaml
 - pmOS → Nura rename: https://linuxiac.com/postmarketos-is-now-nura-after-major-project-rebrand/ ,
   https://itsfoss.com/news/postmarketos-nura-rebranding/

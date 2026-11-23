@@ -1,4 +1,4 @@
-# WMT userspace for the TB-7304X (static, runs on the Alpine rootfs). Built by scripts/build-in-docker.sh.
+# WMT userspace for the TB-7304X (static, runs on the Alpine rootfs). Built by device/build/build-in-docker.sh.
 CC ?= gcc
 CFLAGS ?= -O2
 CFLAGS += -D_GNU_SOURCE -DSTATIC_BUILD -static -Wno-format

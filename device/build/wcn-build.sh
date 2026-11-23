@@ -1,6 +1,6 @@
 #!/bin/bash
-# Quick compile of the WiFi driver only (drivers/misc/mediatek, from mainline/wcn), inside tb7304-build.
-# Host: mainline/scripts/build.sh wcn. Shares the kernel build volume, so a full build afterwards is incremental.
+# Quick compile of the WiFi driver only (drivers/misc/mediatek, from device/wcn), inside tb7304-build.
+# Host: device/build/build.sh wcn. Shares the kernel build volume, so a full build afterwards is incremental.
 set -uo pipefail
 M=/m; K=$M/src/linux; O=/kout
 [ "$(uname -m)" != aarch64 ] && export CROSS_COMPILE=aarch64-linux-gnu-

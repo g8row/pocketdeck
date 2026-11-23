@@ -5,7 +5,7 @@
 > implementation note in §1.
 
 Sources used:
-- `mainline/stock/stock.dts` (stock 3.18 DTB, decompiled).
+- `device/stock/stock.dts` (stock 3.18 DTB, decompiled).
 - Stock kernel, unpacked from `backup/partitions/boot.bin` (gzip Image, 17.8 MB). Strings are in
   `scratchpad/stockk/strings.txt`. Its build paths show this file list:
   `drivers/misc/mediatek/power/mt6735/charging_hw_sm5414.c`, `battery_meter_hal.c`, `pmic_chr_type_det.c`,
@@ -48,7 +48,7 @@ Relevant options in the current `.config`:
 
 ## 1. Charger: SM5414 on I2C3 @0x49
 
-**Implemented 2026-11-17** (`mainline/patches/sm5414_charger.c`, STATUS.md). Measured on the device, differing from
+**Implemented 2026-11-17** (`device/patches/sm5414_charger.c`, STATUS.md). Measured on the device, differing from
 the plan below:
 - LK leaves VBUSLIMIT at 450 mA. That is about what the running tablet draws, so the battery got ~0 mA (fuel gauge)
   while STATUS said TOPOFF. The driver sets 1 A; the battery then takes the full 440-500 mA.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Bluetooth on the TB-7304X (MT6625L via CONSYS, the WMT driver's HCI device, mainline/wcn).
+# Bluetooth on the TB-7304X (MT6625L via CONSYS, the WMT driver's HCI device, device/wcn).
 #   bt-up        WMT core (wifi-up core), BD address from NVRAM (/etc/firmware/nvram/BT_Addr), power on via mgmt
 #   bt-up off    power off
 # Uses btmgmt (bluez-btmgmt). For pairing and profiles run bluetoothd (bluez, needs dbus) on top.

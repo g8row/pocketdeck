@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build PocketJS for the tablet's mainline Alpine and install it as the `pocketjs` OpenRC service.
-#   mainline/scripts/pocketjs-deploy.sh [app-manifest]      (default: apps/desk/pocket.json)
+#   tools/pocketjs-deploy.sh [app-manifest]      (default: apps/desk/pocket.json)
 # Needs on the host (user-level is fine): rustup + target aarch64-unknown-linux-musl, Zig (cross C compiler for
 # QuickJS; ZIG=path, default ~/.local/opt/zig-*/zig), Bun. Links with Rust's own rust-lld + self-contained musl,
 # so the binary is static and needs nothing from Alpine.
@@ -9,8 +9,8 @@ set -euo pipefail
 # macOS tar would add AppleDouble ._* files for files with extended attributes; harmless elsewhere
 export COPYFILE_DISABLE=1
 HERE=$(cd "$(dirname "$0")" && pwd)
-ROOT=$(cd "$HERE/../../pocketjs" && pwd)
-OVL=$(cd "$HERE/../rootfs/overlay" && pwd)
+ROOT=$(cd "$HERE/../pocketjs" && pwd)
+OVL=$(cd "$HERE/../device/rootfs/overlay" && pwd)
 MANIFEST=${1:-apps/desk/pocket.json}
 TAB=${TAB:-root@172.16.42.1}
 export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"

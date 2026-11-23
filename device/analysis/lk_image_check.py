@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Offline model of what the TB-7304X stock LK (lk.bin, built Aug 28 2018) does with a 64-bit Android boot image
 # in `boot` or `recovery`. Every rule cites the LK address it was read from; see
-# docs/mainline/research-lk-bootflow.md. Exit status 0 = LK will boot it deterministically, 1 = it will not
+# docs/hardware/research-lk-bootflow.md. Exit status 0 = LK will boot it deterministically, 1 = it will not
 # (or only by luck, using a DTB left in RAM by the previous boot).
 #
 #   lk_image_check.py <image> [<image> ...]        (an image file or a raw 16 MiB partition dump)

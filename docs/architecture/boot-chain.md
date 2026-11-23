@@ -27,7 +27,7 @@ BROM → preloader → LK (stock, never modified)
   │          └─ default: Linux slot A/B       → kernel slot (raw), boot counter; failures → other slot → rescue → Android
   ├─ RTC recovery bit (one-shot, cleared by LK before loading) or Vol+ menu → Recovery
   │     → recovery = Android + Magisk, started by LK directly, U-Boot not involved (runs with ro.boot.mode=recovery)
-  └─ RTC fastboot bit or Vol+ menu → Fastboot → LK fastboot (`mainline/scripts/fbusb`: flash boot/recovery)
+  └─ RTC fastboot bit or Vol+ menu → Fastboot → LK fastboot (`tools/fbusb`: flash boot/recovery)
 ```
 
 Properties this gives:
@@ -83,8 +83,8 @@ Notes:
 
 ## 4. `tbstate` boot record (implemented 2026-11-17)
 
-**Format:** [`mainline/u-boot/tbstate.h`](../../mainline/u-boot/tbstate.h), shared by the U-Boot command
-(`tb7304x_tbstate.c`) and the Linux/Android tool (`mainline/initramfs/tbstate.c`, built static into the initramfs
+**Format:** [`device/u-boot/tbstate.h`](../../mainline/u-boot/tbstate.h), shared by the U-Boot command
+(`tb7304x_tbstate.c`) and the Linux/Android tool (`device/initramfs/tbstate.c`, built static into the initramfs
 and `out/tbstate`).
 - **Copies:** two 512-byte copies, the second 64 KiB after the first. Each has magic `TBS1`, version, generation and
   CRC32 (zlib), plus `default` (linux/android), `oneshot` (none/linux/android/fastboot), `attempts`, `max` (3),
@@ -116,7 +116,7 @@ Tool usage (Linux: `/usr/local/sbin/tbstate`, initramfs: `tbstate`, Android: `/d
 
 ## 5. Boot menu (GUI) (implemented 2026-11-17)
 
-`mainline/initramfs/bootmenu.c` is a static program in the stage-1 initramfs. It draws on `/dev/fb0` (600×1024,
+`device/initramfs/bootmenu.c` is a static program in the stage-1 initramfs. It draws on `/dev/fb0` (600×1024,
 Terminus 16×32, generated at build time from the kernel's `lib/fonts/font_ter16x32.c`) and reads every
 `/dev/input/event*` (Goodix touch, keypad Vol±, `mt6328-keys` Power).
 - **When it runs:** stage 1 starts it after the USB gadget is up, so telnet works meanwhile, and before mounting
@@ -164,7 +164,7 @@ recovery, para).
 3. **Write the new GPT**, both primary and backup. Only `userdata`'s end LBA changes, plus entries 24–30 and the
    entry count. Write it from mainline Linux with `sgdisk`, or with mtkclient from BROM. Reboot, then check LK and
    Android still start. Android will refuse the oversized encrypted `userdata`; that is expected.
-   **Done 2026-11-17 ~15:50** with `mainline/scripts/tb-gpt.py` (tables in `backup/partitions/2026-11-17-newgpt/`,
+   **Done 2026-11-17 ~15:50** with `tools/tb-gpt.py` (tables in `backup/partitions/2026-11-17-newgpt/`,
    pre-write dumps in `2026-11-17-prepart/`, read-back in `2026-11-17-postpart/`), written with `dd` from mainline
    Linux, backup first. After a reboot, preloader → LK → U-Boot → Linux came up and the kernel lists p1–p30 with the
    `tb*` names. Android not yet checked.
@@ -185,7 +185,7 @@ recovery, para).
    The first copy attempt crashed userspace: see "Protected RAM" in STATUS.md (fixed in the DTS before the retry).
 6. **Switch U-Boot's script** from `/cache/linux/boot-target` to `tbstate` and the raw slots. Keep `/cache/linux` as
    a fallback until A/B has worked for a week, then delete it.
-   **Done 2026-11-17 ~19:45** (U-Boot `88be1836…`, previous one in `mainline/out/u-boot-tb7304x-prev.img`). The
+   **Done 2026-11-17 ~19:45** (U-Boot `88be1836…`, previous one in `device/out/u-boot-tb7304x-prev.img`). The
    Linux part of `boot.cmd`, by the attempt count before this boot:
    - `attempts < max`: the record's slot. `a`/`b`: header page of `tbkern_<slot>`, check `ANDROID!`, read
      header + kernel + ramdisk + second (+16 KiB) if it fits the partition, `bootm` with `bootargs=tb.slot=<slot>`

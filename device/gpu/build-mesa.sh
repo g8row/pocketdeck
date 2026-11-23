@@ -2,7 +2,7 @@
 # Cross-build a minimal Mesa (Panfrost only, no LLVM: EGL + GLES2 + GBM) and kmscube for the TB-7304X's Alpine,
 # from an x86_64 Docker host with no arm64 emulation. Zig is the aarch64-musl C/C++ compiler; Alpine's aarch64
 # libdrm/expat/zlib packages, unpacked with apk --root, are the sysroot. Output: out/mesa-opt.tar.gz (-> /opt/mesa).
-#   sh mainline/gpu/build-mesa.sh <zig-tarball> [out-dir]
+#   sh device/gpu/build-mesa.sh <zig-tarball> [out-dir]
 # Mesa 24.3: later Panfrost needs mesa_clc (LLVM + SPIR-V) on the build host for its precompiled shaders.
 # Executables must be PIE: zig links non-PIE executables without working copy relocations against musl's data
 # (optind, environ), so getopt loops forever and getenv() crashes.

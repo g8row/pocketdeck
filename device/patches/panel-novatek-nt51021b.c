@@ -4,7 +4,7 @@
  * ("nt51021b_dsi_vdo_gx" in the stock firmware).
  *
  * Mode, power/reset sequence and the init command list were recovered from the stock 3.18 kernel and LK
- * (docs/mainline/research-display.md) and cross-checked against the DSI registers LK leaves programmed:
+ * (docs/hardware/research-display.md) and cross-checked against the DSI registers LK leaves programmed:
  * burst video, 4 lanes, VSA/VBP/VFP 2/25/35. All commands are 1-parameter short writes (MTK dsi_set_cmdq_V2
  * with count 1 = DCS short write with parameter).
  */

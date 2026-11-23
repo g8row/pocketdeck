@@ -3,7 +3,7 @@
  * Silicon Mitus SM5414 switching charger (Lenovo TB-7304X), plus the battery it charges.
  *
  * Register map from the MediaTek BSP driver (sm5414.h / charging_hw_sm5414.c, see
- * docs/mainline/research-power.md §1). The chip has no host watchdog and no battery NTC input; LK programs it and
+ * docs/hardware/research-power.md §1). The chip has no host watchdog and no battery NTC input; LK programs it and
  * enables charging on every boot. This driver:
  *  - programs CV, charge current, input current limit and top-off current from the monitored battery / DT,
  *    and puts them back if they ever change under it (checked on every poll);

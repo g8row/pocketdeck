@@ -1,6 +1,6 @@
 #!/bin/sh
 # Idempotently add drivers/power/supply/sm5414_charger.c (Silicon Mitus SM5414 charger + the battery it charges,
-# CONFIG_CHARGER_SM5414) to the kernel tree in $1. docs/mainline/research-power.md §1.
+# CONFIG_CHARGER_SM5414) to the kernel tree in $1. docs/hardware/research-power.md §1.
 set -e
 K=$1; M=$(dirname "$0")/..
 cp "$M/patches/sm5414_charger.c" "$K/drivers/power/supply/sm5414_charger.c"

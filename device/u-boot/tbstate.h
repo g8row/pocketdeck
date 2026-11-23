@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * TB-7304X boot record ("tbstate"), shared by U-Boot (tb7304x_tbstate.c) and Linux/Android
- * (mainline/initramfs/tbstate.c). Design: docs/mainline/plan-dualboot.md §4.
+ * (device/initramfs/tbstate.c). Design: docs/architecture/boot-chain.md §4.
  *
  * Two 512-byte copies, each with magic, version, generation and a CRC32 (zlib polynomial, over the whole block
  * with the crc field zero). Readers take the valid copy with the higher generation. Writers write generation+1

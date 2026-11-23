@@ -5,7 +5,7 @@ Date: 2026-11-16. Read-only research. Nothing on the tablet, USB, fastboot or ne
 Sources:
 - `backup/partitions/lk.bin` (ARM32 Thumb, linked 0x41E00000, file offset = va - 0x41E00000 + 0x200).
 - `backup/partitions/boot.bin`: the kernel was gunzipped to `scratchpad/stock/Image`. It is an arm64 3.18 kernel, `Image` offset 0 = VA 0xffffffc000080000. The build path in its strings is `.../ZA1962_601__A/kernel-3.18`.
-- `mainline/stock/stock.dts`.
+- `device/stock/stock.dts`.
 - The mt6735-mainline tree at tag `v7.0.10-mt6735` (046883c), sparse-cloned to `scratchpad/src/linux`.
 - The decompiled stock DTB of an MT6735 (D1) phone (Wiko U FEEL), from pmaports commit 136ef57, used for comparison.
 
@@ -34,7 +34,7 @@ So the dtsi is not "wrong". It describes the other die. We need D2 overrides. `m
 ### Corrections to the "known facts" in the brief
 - MUTEX is **0x14015000**, not 0x14013000. 0x14013000 is DPI0.
 - larb0 is **0x14016000** and smi_common is **0x14017000**.
-- Consequence for `mainline/initramfs/init`: the display watcher's `larb0=$(r 0x14015004)` really reads **MUTEX INTSTA**, and `smi=$(r 0x14016004)` really reads **larb0+4**.
+- Consequence for `device/initramfs/init`: the display watcher's `larb0=$(r 0x14015004)` really reads **MUTEX INTSTA**, and `smi=$(r 0x14016004)` really reads **larb0+4**.
 - Today, the mainline `smi_larb0` node (0x14015000) points at the **MUTEX block**. `mtk-smi` larb `config_port` would write MMU_EN etc. into mutex registers. That is probably part of why patch 0002 (skip larb config without iommu) was needed.
 
 ### Full block map for this chip (stock DTB `DISPSYS` array, confirmed by the separate stock nodes)
@@ -414,7 +414,7 @@ Notes on the snippet:
 3. **Possibly** D2 `clk-mt6735-mm` gate bits and `MT6735_MM_RST0_DSI`, if step 0 shows they shift.
 4. **Possibly** a D2 m4u port header (or just raw `MTK_M4U_ID(0,n)` in DT as above). The mainline names `M4U_PORT_DISP_RDMA0`/`WDMA0` have D1 values.
 5. Hand-over: make `mtk-lk-fb` / simpledrm step aside. Either use `lkfb.enable=0` while testing, or call `aperture_remove_all_conflicting_devices()` in `mtk_drm_bind`.
-6. `mainline/initramfs/init` display watcher: fix the larb0/smi labels and addresses (larb0 is 0x14016000, MUTEX is 0x14015000).
+6. `device/initramfs/init` display watcher: fix the larb0/smi labels and addresses (larb0 is 0x14016000, MUTEX is 0x14015000).
 
 ---
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# WiFi on the TB-7304X (MT6625L via CONSYS, driver mainline/wcn). Each step is skipped when already done.
+# WiFi on the TB-7304X (MT6625L via CONSYS, driver device/wcn). Each step is skipped when already done.
 #   wifi-up                     radio on, interface up (scan with: iw dev mt6625_0 scan)
 #   wifi-up <ssid> <password>   ... and join (config in /tmp, RAM only), DHCP
 #   wifi-up join                ... and join with the saved networks ($SAVED), DHCP
@@ -7,7 +7,7 @@
 #   wifi-up core                only the WMT core (loader + launcher), WiFi radio off: used by bt-up
 #   wifi-up off                 leave, radio off
 # The OpenRC service `wifi` runs `wifi-up join` at boot when $SAVED exists.
-# Needs /etc/firmware (mainline/scripts/wifi-deploy.sh), wmt_loader + stp_uart_launcher in /usr/local/sbin,
+# Needs /etc/firmware (tools/wifi-deploy.sh), wmt_loader + stp_uart_launcher in /usr/local/sbin,
 # and the iw, wpa_supplicant packages. Logs in /tmp/wifi/. The board is 2.4 GHz only (its NVRAM disables 5 GHz).
 IF=mt6625_0 L=/tmp/wifi SAVED=/data/wifi/wpa_supplicant.conf
 PATH=/usr/local/sbin:$PATH
@@ -42,7 +42,7 @@ if [ "$1" = off ]; then
 	echo "wifi off"; exit 0
 fi
 
-[ -f /etc/firmware/WIFI_RAM_CODE ] || die "no /etc/firmware (run mainline/scripts/wifi-deploy.sh on the host)"
+[ -f /etc/firmware/WIFI_RAM_CODE ] || die "no /etc/firmware (run tools/wifi-deploy.sh on the host)"
 # 1. WMT core + WiFi char devices (built-in drivers, registered on request)
 if [ ! -e /dev/stpwmt ]; then
 	wmt_loader > $L/loader.log 2>&1 || die "wmt_loader failed, see $L/loader.log"

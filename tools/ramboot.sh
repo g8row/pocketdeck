@@ -1,15 +1,15 @@
 #!/bin/sh
 # RAM-boot a kernel image through U-Boot fastboot without writing anything: the next normal boot is the installed one.
-#   mainline/scripts/ramboot.sh [image]      default: mainline/out/boot-mainline-uboot.img (scripts/build.sh)
+#   tools/ramboot.sh [image]      default: device/out/boot-mainline-uboot.img (device/build/build.sh)
 # From running mainline Linux (`tb-reboot uboot`) or with the tablet already in U-Boot fastboot. macOS or Linux host
 # with `fastboot` (Linux: USB access for the fastboot device, e.g. a udev rule, or run as root).
 # Note: without `tb.slot=` on the cmdline the initramfs uses the old root image in /cache (/cache/linux/rootfs.img),
 # not tbroot_a. If the image panics, the tablet reboots into the installed kernel after 10 s; read the panic with
 # `mount -t pstore pstore /sys/fs/pstore; cat /sys/fs/pstore/console-ramoops-0`.
 set -eu
-M=$(cd "$(dirname "$0")/.." && pwd)
-IMG=${1:-$M/out/boot-mainline-uboot.img}
-TB=$M/scripts/tb.sh
+R=$(cd "$(dirname "$0")/.." && pwd)
+IMG=${1:-$R/device/out/boot-mainline-uboot.img}
+TB=$R/tools/tb.sh
 [ -f "$IMG" ] || { echo "no $IMG"; exit 1; }
 command -v fastboot >/dev/null || { echo "fastboot not found (macOS: brew install android-platform-tools; Debian: apt install fastboot)"; exit 1; }
 in_fastboot() { fastboot devices 2>/dev/null | grep -q fastboot; }

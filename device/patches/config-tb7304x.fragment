@@ -54,7 +54,7 @@ CONFIG_PANIC_TIMEOUT=10
 CONFIG_MEDIATEK_MT6577_AUXADC=y
 CONFIG_NVMEM_MTK_EFUSE=y
 CONFIG_MTK_SOC_THERMAL=y
-# WiFi: MediaTek CONSYS (MT6737M + MT6625L) through WMT/STP/BTIF + wlan_gen2, out-of-tree driver in mainline/wcn
+# WiFi: MediaTek CONSYS (MT6737M + MT6625L) through WMT/STP/BTIF + wlan_gen2, out-of-tree driver in device/wcn
 # (patches/0011). Built in, like the stock kernel; nothing is powered until wmt_launcher opens /dev/stpwmt.
 CONFIG_MTK_PLATFORM="mt6735"
 CONFIG_MTK_COMBO=y

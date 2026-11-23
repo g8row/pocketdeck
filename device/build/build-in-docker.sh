@@ -54,7 +54,7 @@ $CC -static -O2 -Wall -Wextra -I /build -o $R/bin/bootmenu $M/initramfs/bootmenu
 $STRIP $R/bin/bootmenu
 # static e2fsck for the ext4 roots (tbroot_a/b, tbdata): /opt/arm64 on x86_64 hosts, the native package on arm64
 E2FSCK=$(ls /opt/arm64/sbin/e2fsck.static /opt/arm64/usr/sbin/e2fsck.static /sbin/e2fsck.static /usr/sbin/e2fsck.static 2>/dev/null | head -n1 || true)
-[ -n "$E2FSCK" ] || { echo "no e2fsck.static: rebuild the tb7304-build image (scripts/Dockerfile)"; exit 1; }
+[ -n "$E2FSCK" ] || { echo "no e2fsck.static: rebuild the tb7304-build image (device/build/Dockerfile)"; exit 1; }
 file -L "$E2FSCK" | grep -q "ARM aarch64.*statically linked" || { echo "$E2FSCK is not a static aarch64 binary"; exit 1; }
 cp "$E2FSCK" $R/bin/e2fsck; $STRIP $R/bin/e2fsck 2>/dev/null || true
 cp $M/initramfs/init $R/init; chmod 755 $R/init
