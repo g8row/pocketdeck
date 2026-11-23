@@ -81,6 +81,24 @@ Research notes: [display](research-display.md), [power/charger/sensors](research
 - Verified with a stuck phantom present (injected taps on all 8 nav cells work). Not yet seen live: the learner during a storm.
 - **UI rule of thumb:** keep tap targets off the landscape left edge (x < 64, y 60–120) and the strip under the nav
   (y 35–60); the nav bar itself is clean. Untried fix: drop broken channels from the GT9293 config.
+- 2026-11-23, tablet assembled in its final position: 10 min raw capture (`evtest`) with nobody touching → **0
+  phantom contacts**; the host filters stay on.
+
+## Panel damage (dead pixels, crack)
+Mapped 2026-11-23 by photographing `tools/panel-grid.py grid` (UI logical units, 512×300, nav included). All damage
+is left of x 104; the rest of the panel is clean.
+
+| Zone | x | y | What |
+|---|---|---|---|
+| A | 16–44 | 0–70 | crack + black wedge (through the nav strip) |
+| B | 63–102 | 112–203 | black bar + hatched pixels |
+| C | 54–80 | 192–300 | diagonal dark streak |
+| D | 28–88 | 254–300 | dead-pixel blob |
+| E | 76–81, 99–104 | 56–110, 55–73 | thin dead lines |
+
+The deck app keeps the strip x < 106 for an ambient ridge field only (no text, no touch targets); the nav and the
+panes use the 406 px to its right (`pocketjs/apps/desk/damage.ts`). Re-map after any change with
+`pd ssh 'rc-service pocketdeck-ui stop'; tools/panel-grid.py grid | tools/tb.sh 'cat > /dev/fb0'`.
 
 ## Boot time (power-on to the UI)
 | Stage | Before | Now |

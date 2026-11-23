@@ -90,7 +90,7 @@ export interface DeckConfig {
 export function defaultConfig(): DeckConfig {
   return {
     version: 1,
-    panes: ["home", "claude", "pulse", "deck", "music", "board", "focus", "system"],
+    panes: ["home", "claude", "deck", "music", "board", "system"], // pulse, focus: off for now (the deck app hides them too)
     accent: ACCENTS.sky!,
     tiles: defaultTiles.map((t) => {
       const { sub: _sub, ...rest } = t;
