@@ -75,7 +75,7 @@ for opt in TOUCHSCREEN_GOODIX KEYBOARD_MT6779 MODULES MTK_COMBO MTK_COMBO_WIFI M
   grep -E "^(# )?CONFIG_${opt}[= ]" $O/.config || echo "   CONFIG_$opt missing"; done
 # The full log goes to out/kernel-build.log. A failed build must stop here: before, the errors were only filtered
 # out of the output and the previous Image was packaged as if nothing had happened.
-if ! make -C $K O=$O ARCH=arm64 -j$JOBS KBUILD_BUILD_USER=tb7304 KBUILD_BUILD_HOST=mainline Image.gz \
+if ! make -C $K O=$O ARCH=arm64 -j$JOBS KBUILD_BUILD_USER=tb7304 KBUILD_BUILD_HOST=pocketdeck ${PD_VERSION:+KBUILD_BUILD_VERSION=$PD_VERSION} Image.gz \
 	mediatek/mt6737m-lenovo-tb7304x.dtb > $OUT/kernel-build.log 2>&1; then
   grep -E "error|Error [0-9]" $OUT/kernel-build.log | head -40
   echo "== kernel build FAILED (out/kernel-build.log)"; exit 1
