@@ -1,6 +1,6 @@
 # PocketDeck restructure plan (v2)
 
-Status: **in progress** on branch `repo/restructure`. v1 (2026-11-20) was reviewed on 2026-11-23 against the repo
+Status: **steps 1–6 done** on branch `repo/restructure` (2026-11-23); 7–9 pending. v1 (2026-11-20) was reviewed on 2026-11-23 against the repo
 and the live tablet; this version replaces it. Progress is tracked in §9.
 
 Goal: the project becomes **PocketDeck**, a Linux-first product. The device path is
@@ -51,7 +51,7 @@ pocketdeck/
 │  ├─ index.md          one line per doc
 │  ├─ install/          00-prerequisites … 05-pocketdeck, recovery.md
 │  ├─ hardware/         status.md (THE live status), research-*.md
-│  ├─ architecture/     boot-chain.md, deckd.md
+│  ├─ architecture/     boot-chain.md (deckd is documented in deckd/README.md)
 │  ├─ dev/              build.md, workflow.md (RAM boots, slots, deploy loop), lessons.md, conventions.md
 │  ├─ assets/           screenshots/, boot-screens/
 │  └─ history/README.md retired docs and how to read them (`git show android-era-final:<path>`)
@@ -156,12 +156,12 @@ Kernel build numbers (`#18`) differ per build machine and were mixed up in the d
 
 | # | Step | Needs | State |
 |---|---|---|---|
-| 1 | Freeze: local tag `android-era-final` at the pre-restructure `main`; rename `mainline-bringup` → `archive/mainline-bringup` locally | – | |
-| 2 | Retire history docs (delete; `docs/history/README.md`, `docs/dev/lessons.md`) | – | |
-| 3 | Moves, one commit per top-level move, `.gitignore` updated in the same commit (`mainline/out` is ~600 MB) | – | |
-| 4 | Path fixes after the moves, then renames (deskd → deckd, env/config fallbacks, kiosk/mainline prose, service name); update local Claude Code hook paths | – | |
-| 5 | `pd`, `.pd.env.example`, slot-B install, build identity | – | |
-| 6 | Docs: README, CLAUDE.md, index, install/, architecture/, dev/, compacted status + research; CI (deckd tests, shellcheck, link check, stale-name grep) | – | |
+| 1 | Freeze: local tag `android-era-final` at the pre-restructure `main`; rename `mainline-bringup` → `archive/mainline-bringup` locally | – | done: tag `android-era-final` (local, not pushed), branch renamed |
+| 2 | Retire history docs (delete; `docs/history/README.md`, `docs/dev/lessons.md`) | – | done |
+| 3 | Moves, one commit per top-level move, `.gitignore` updated in the same commit (`mainline/out` is ~600 MB) | – | done (`git log --follow` checked) |
+| 4 | Path fixes after the moves, then renames (deskd → deckd, env/config fallbacks, kiosk/mainline prose, service name); update local Claude Code hook paths | – | done; hooks updated; `pocketdeck-ui` deployed and verified on the tablet 2026-11-23 |
+| 5 | `pd`, `.pd.env.example`, slot-B install, build identity | – | done (`pd state`, `pd doctor`, `pd deploy` used against the tablet; build/install not yet run) |
+| 6 | Docs: README, CLAUDE.md, index, install/, architecture/, dev/, compacted status + research; CI (deckd tests, shellcheck, link check, stale-name grep) | – | done; `tools/check-repo.sh` passes, deckd tests pass |
 | 7 | Device verification (§10): build, install to slot B, boot B, deploy, deckd | user OK (writes flash) | |
 | 8 | Publish: push tag + branches, GitHub rename, `git remote set-url`, merge (no squash), `v0.1.0` | user OK (public) | |
 | 9 | pocketjs work (§7) | separate | |
