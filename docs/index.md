@@ -30,6 +30,7 @@
 - [build.md](dev/build.md): what each build makes, inputs, enforced checks, build identity
 - [lessons.md](dev/lessons.md): facts that cost time to learn
 - [conventions.md](dev/conventions.md): branches, commits, docs, privacy
+- [ui-redesign.md](dev/ui-redesign.md): the UI redesign plan, integration steps and the plumbing briefs
 
 ## Elsewhere
 - [device/u-boot/README.md](../device/u-boot/README.md): U-Boot board files and patches
