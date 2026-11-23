@@ -113,8 +113,8 @@ build)
 		for s in $steps; do case $s in
 		kernel|wcn) ssh "$H" "cd '$D' && PD_VERSION=$PD_VERSION sh device/build/build.sh $( [ $s = wcn ] && echo wcn )" ;;
 		rootfs) [ -n "$KEY" ] || die "no ssh public key (PD_SSH_PUBKEY)"
-			scp -q "$KEY" "$H:$D/device/out/authorized_keys.in"
-			ssh "$H" "cd '$D' && sh device/rootfs/build-rootfs.sh device/out/authorized_keys.in" ;;
+			scp -q "$KEY" "$H:$D/.pd-authorized_keys"      # not in device/out: that is root-owned (Docker)
+			ssh "$H" "cd '$D' && sh device/rootfs/build-rootfs.sh .pd-authorized_keys" ;;
 		mesa) ssh "$H" "cd '$D' && sh device/gpu/build-mesa.sh '${PD_ZIG_TARBALL:?set PD_ZIG_TARBALL (a path on the build host)}'" ;;
 		esac; done
 		echo "▸ fetch outputs"
