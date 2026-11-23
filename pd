@@ -115,7 +115,7 @@ build)
 		rootfs) [ -n "$KEY" ] || die "no ssh public key (PD_SSH_PUBKEY)"
 			scp -q "$KEY" "$H:$D/device/out/authorized_keys.in"
 			ssh "$H" "cd '$D' && sh device/rootfs/build-rootfs.sh device/out/authorized_keys.in" ;;
-		mesa) ssh "$H" "cd '$D' && sh device/gpu/build-mesa.sh \"\${PD_ZIG_TARBALL:?set PD_ZIG_TARBALL on the build host}\"" ;;
+		mesa) ssh "$H" "cd '$D' && sh device/gpu/build-mesa.sh '${PD_ZIG_TARBALL:?set PD_ZIG_TARBALL (a path on the build host)}'" ;;
 		esac; done
 		echo "▸ fetch outputs"
 		mkdir -p "$OUT" "$R/device/rootfs/out" "$R/device/gpu/out"

@@ -48,6 +48,8 @@ rollback. The UI is PocketJS (submodule) fed by `deckd` (Bun) on the host.
 Layout: `device/` = everything that ends up on the tablet (its Docker build mounts it at `/m`, keep its inner
 layout), `tools/` = host scripts, `deckd/`, `pocketjs/` (submodule, branch `android-host`), `archive/android/`.
 Keep scratch files in `device/out/work/` (git-ignored), not in temp dirs.
+Machine-specific setup (build host, paths) lives in the git-ignored `.pd.env` and `CLAUDE.local.md`; read
+the latter if it exists.
 
 ## Conventions
 
