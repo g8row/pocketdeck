@@ -21,11 +21,12 @@ PIN=$(sed -n 's/^PIN=//p' "$M/u-boot/build-uboot.sh")
 docker volume create tb7304-ubuild >/dev/null
 docker run --rm -v "$M":/m -v tb7304-ubuild:/uout tb7304-build bash /m/u-boot/build-uboot.sh
 sha() { if command -v sha256sum >/dev/null; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
+# out/ is root-owned (written by the container), so BUILDINFO is written through the container too
 {
 	echo "version=$PD_VERSION"
 	echo "built=$(date -u +%Y-%m-%dT%H:%MZ)"
 	echo "kernel_src=$(git -C "$M/src/linux" rev-parse --short=12 HEAD 2>/dev/null)"
 	echo "uboot_src=$(git -C "$M/src/u-boot" rev-parse --short=12 HEAD 2>/dev/null)"
 	(cd "$M/out" && sha boot-mainline-uboot.img u-boot-tb7304x.img 2>/dev/null | awk '{print "sha256 " $2 " " $1}')
-} > "$M/out/BUILDINFO"
+} | docker run --rm -i -v "$M":/m tb7304-build sh -c 'cat > /m/out/BUILDINFO'
 cat "$M/out/BUILDINFO"
