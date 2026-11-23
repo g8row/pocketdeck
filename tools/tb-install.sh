@@ -6,7 +6,8 @@
 # Default slot: the one NOT running (tb.slot= on the tablet's cmdline), so the running system stays intact and is
 # the fallback. Writing the running slot's root is refused; for that, RAM-boot first (tools/ramboot.sh).
 # What the image does not contain is carried over from the running root (or, after a RAM boot, from the old root
-# of the target slot): /opt/pocketjs, /etc/firmware (WiFi firmware + NVRAM), dropbear's host keys. /data is not
+# of the target slot): /opt/pocketjs, /etc/firmware (WiFi firmware + NVRAM), dropbear host keys, root's
+# authorized_keys (the image only has the build key). /data is not
 # touched. With BACKUP=1 the old target root is first saved to backup/tbroot_<slot>-<date>.tar.gz on this host.
 # What was installed is recorded on the tablet in /data/pocketdeck/slot-<slot>.{kernel,rootfs} (with BUILDINFO).
 # A slot boots tbkern_<slot> WITH tbroot_<slot>: install both into a slot unless the other half is known good.
@@ -69,7 +70,7 @@ rootfs)
 		"$TB" "$unmount_all"
 	fi
 	# files the image does not carry: from the running root if it is an installed one, else from the old target root
-	KEEP="opt/pocketjs etc/firmware etc/dropbear/*_host_key*"
+	KEEP="opt/pocketjs etc/firmware etc/dropbear/*_host_key* root/.ssh/authorized_keys"
 	if "$TB" "grep -q '^/dev/mmcblk0p[0-9]* / ' /proc/mounts && grep -q tbroot_ /sys/class/block/\$(sed -n 's|^/dev/\(mmcblk0p[0-9]*\) / .*|\1|p' /proc/mounts)/uevent"; then
 		FROM=/; echo "rootfs: keeping $KEEP from the running root"
 	else
