@@ -1,21 +1,26 @@
 # PocketDeck
 
 **A 2017 Lenovo Tab 7 (TB-7304X, MT6737M) turned into a 60 fps desk display**: Claude Code sessions, a stream-deck
-grid, Now Playing, host and tablet vitals and a focus timer. It runs mainline Linux, and saving a UI file on the
-host hot-reloads the tablet in about 2 seconds.
+grid, now playing, host and tablet vitals, Claude usage and the tablet's own settings. It runs mainline Linux, and
+saving a UI file on the host hot-reloads the tablet in about 2 seconds.
+
+The panel is cracked, with dead pixels on the left fifth: that strip is the **rail** (clock, date, Claude status,
+battery and an ASCII sound wave) and every page lives in the clean area to its right. Read-only content is drawn
+as terminal frames, everything you tap is rounded; icons are single-colour Nerd Font glyphs.
 
 | | |
 |---|---|
-| ![home](docs/assets/screenshots/home.png) | ![claude](docs/assets/screenshots/claude.png) |
-| **HOME**: clock, ASCII ridge field, glance row | **CLAUDE**: live sessions, tokens, context, tool timeline, quick actions |
-| ![permission](docs/assets/screenshots/permission.png) | ![board](docs/assets/screenshots/board.png) |
-| **Alerts**: a session needs you; allow/deny from the tablet | **BOARD**: every live number in one cell grid |
-| ![pulse](docs/assets/screenshots/pulse.png) | ![deck](docs/assets/screenshots/deck.png) |
-| **PULSE**: today's Claude usage, by hour and project | **DECK**: tappable actions that run on the host |
-| ![focus](docs/assets/screenshots/focus-running.png) | ![system](docs/assets/screenshots/system.png) |
-| **FOCUS**: a timer whose shape fans out as time runs down | **SYSTEM**: frame-time graph against the 16.7 ms budget |
+| ![board](docs/assets/screenshots/board.png) | ![deck](docs/assets/screenshots/deck.png) |
+| **BOARD**: host and tablet vitals, 1m / 10m / 1h history | **DECK**: tappable actions that run on the host |
+| ![claude](docs/assets/screenshots/claude.png) | ![claude question](docs/assets/screenshots/claude-question.png) |
+| **CLAUDE**: live sessions, reply, current step, context | **CLAUDE**: answer questions, approve plans and permissions from the tablet |
+| ![usage](docs/assets/screenshots/usage.png) | ![music](docs/assets/screenshots/music.png) |
+| **USAGE**: today's tokens by hour and project, or the last 7 days | **MUSIC**: cover art, tap-to-seek bar, shuffle, repeat, volume |
+| ![settings](docs/assets/screenshots/settings.png) | ![settings confirm](docs/assets/screenshots/settings-confirm.png) |
+| **SETTINGS**: reboot targets, brightness, WiFi, charge limit, system info | confirmations pause the cracked glass's ghost-touch filters |
 
-Panes and tiles are configured in **Deck Studio**, a small web app deckd serves on localhost.
+Screenshots come from the PocketJS web renderer with mock data (`pocketjs/apps/desk/preview`); panes and tiles
+are configured in **Deck Studio**, a small web app deckd serves on localhost.
 
 ## From a stock tablet
 
@@ -61,10 +66,12 @@ Panes and tiles are configured in **Deck Studio**, a small web app deckd serves 
 
 Works on the device: display (mediatek-drm, 60 Hz), touch, buttons, 4 cores with cpufreq, GPU (Panfrost), eMMC,
 USB networking, WiFi, charger/battery/RTC/thermal, accelerometer; the boot chain with slots, boot counter, boot menu
-and Android rollback; the deck UI with hot reload, all panes, deck actions and Claude hooks; Deck Studio.
+and Android rollback; the redesigned UI (six pages, rail, hot reload, deck actions, Claude hooks), tablet settings
+run locally on the tablet (reboot targets, brightness, WiFi, charge limit), Deck Studio.
 
 Open: Bluetooth (powers on, scans find nothing), hardware display planes, GPU frequency scaling; approving
-permission prompts from the tablet is built but experimental. Audio, camera and modem are not planned.
+permission prompts from the tablet is built but experimental; the macOS side of deckd's new data (Music.app
+controls, lock detection) is written but untested. Audio, camera and modem are not planned.
 Details: [docs/hardware/status.md](docs/hardware/status.md).
 
 ## Credits
