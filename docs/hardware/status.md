@@ -83,6 +83,9 @@ Research notes: [display](research-display.md), [power/charger/sensors](research
   (y 35–60); the nav bar itself is clean. Untried fix: drop broken channels from the GT9293 config.
 - 2026-11-23, tablet assembled in its final position: 10 min raw capture (`evtest`) with nobody touching → **0
   phantom contacts**; the host filters stay on.
+- 2026-11-24: mask and learner **off** (`POCKETJS_TOUCH_MASK=""`, `POCKETJS_TOUCH_LEARN=0`): the learner also masked
+  real taps (~10 quick taps on one button within a minute). 12 of 12 identical injected taps now arrive. The stale
+  filter (3 s) stays; turn the other two back on in `/etc/conf.d/pocketdeck-ui` if phantoms return.
 
 ## Panel damage (dead pixels, crack)
 Mapped 2026-11-23 by photographing `tools/panel-grid.py grid` (UI logical units, 512×300, nav included). All damage
