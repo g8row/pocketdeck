@@ -6,10 +6,13 @@ POCKETJS_POWER=ignore
 # "x0,y0,x1,y1;...": a contact that STARTS in one is dropped by the PocketJS host for its whole life. Measured
 # 2026-11-17 with nobody touching (~1.4 phantom contacts/s, 96% start in the first rect; the second is one spot
 # at the left edge). In the landscape UI the first rect is logical x 0-62, y 65-115. Empty = no mask.
-POCKETJS_TOUCH_MASK="370,0,470,125;0,105,15,130"
+# Off since the tablet's final assembly: an idle capture found no phantom contacts. The old mask was
+# "370,0,470,125;0,105,15,130".
+POCKETJS_TOUCH_MASK=""
 # A contact held still (within ~20 px) for longer than this is hidden until it lifts, so a stuck phantom contact
 # or a thumb resting on the glass cannot block every other touch (the UI follows one primary contact). 0 = off.
 POCKETJS_TOUCH_STALE_MS=3000
 # Learn phantom spots (the cracked areas move over time): 40 px cells that keep producing contacts which barely move
 # (>= 10 with a 60 s decay) are masked until they go quiet. 1 = on.
-POCKETJS_TOUCH_LEARN=1
+# Off: it also learned real taps (~10 quick taps on one button within a minute masked that button).
+POCKETJS_TOUCH_LEARN=0

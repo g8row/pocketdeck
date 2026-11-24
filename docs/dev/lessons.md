@@ -125,7 +125,8 @@ Sources are in git history (tag `android-era-final`, see [history](../history/RE
   (not D-Bus `reconfigure`), and KConfig notifies only when the value changes. Plasma's widget DND is
   `plasmanotifyrc [DoNotDisturb] Until`; the `Notifications.Inhibited` property covers both it and app inhibits.
 - The touch learner scores every short, still tap in its 40 px cell: ~10 taps on one spot within a minute mask
-  it (injected test taps that never move hit this first; so could fast repeated taps on one button).
+  it (injected test taps that never move hit this first; so could fast repeated taps on one button). The
+  mask and the learner are off since the final assembly (no phantom contacts idle); only the stale filter stays.
 
 ## UI (PocketJS)
 
