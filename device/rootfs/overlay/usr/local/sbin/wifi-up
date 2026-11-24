@@ -1,0 +1,84 @@
+#!/bin/sh
+# WiFi on the TB-7304X (MT6625L via CONSYS, driver device/wcn). Each step is skipped when already done.
+#   wifi-up                     radio on, interface up (scan with: iw dev mt6625_0 scan)
+#   wifi-up <ssid> <password>   ... and join (config in /tmp, RAM only), DHCP
+#   wifi-up join                ... and join with the saved networks ($SAVED), DHCP
+#   wifi-up save <ssid> <password>   add/replace a network in $SAVED (on /data: survives root reflashes)
+#   wifi-up core                only the WMT core (loader + launcher), WiFi radio off: used by bt-up
+#   wifi-up off                 leave, radio off
+# The OpenRC service `wifi` runs `wifi-up join` at boot when $SAVED exists.
+# Needs /etc/firmware (tools/wifi-deploy.sh), wmt_loader + stp_uart_launcher in /usr/local/sbin,
+# and the iw, wpa_supplicant packages. Logs in /tmp/wifi/. The board is 2.4 GHz only (its NVRAM disables 5 GHz).
+IF=mt6625_0 L=/tmp/wifi SAVED=/data/wifi/wpa_supplicant.conf
+PATH=/usr/local/sbin:$PATH
+mkdir -p $L
+die() { echo "wifi-up: $*" >&2; exit 1; }
+
+if [ "$1" = save ]; then
+	[ $# -eq 3 ] || die "usage: wifi-up save <ssid> <password>"
+	mkdir -p "${SAVED%/*}" && chmod 700 "${SAVED%/*}"
+	umask 077
+	# drop an existing block for this SSID, then append the new one
+	if [ -f $SAVED ]; then
+		awk -v s="ssid=\"$2\"" '/^network=\{/ { b = $0; inb = 1; keep = 1; next }
+			inb { b = b "\n" $0; if ($1 == s) keep = 0; if ($0 ~ /^}/) { inb = 0; if (keep) print b }; next }
+			{ print }' $SAVED > $SAVED.new
+	else
+		printf 'ctrl_interface=/run/wpa_supplicant\n' > $SAVED.new
+	fi
+	wpa_passphrase "$2" "$3" | grep -v '#psk' >> $SAVED.new || { rm -f $SAVED.new; die "wpa_passphrase failed"; }
+	mv $SAVED.new $SAVED && sync
+	echo "saved '$2' in $SAVED"; exit 0
+fi
+wait_for() { i=0; while ! eval "$1"; do i=$((i + 1)); [ $i -ge "$2" ] && return 1; sleep 1; done; }
+
+if [ "$1" = off ]; then
+	pkill -f "wpa_supplicant .*-i $IF" 2>/dev/null; pkill -f "udhcpc .*-i $IF" 2>/dev/null
+	# wpa_supplicant deauthenticates before it exits; wait so a following wifi-up starts clean
+	wait_for "! pgrep -f 'wpa_supplicant .*-i $IF' > /dev/null && ! pgrep -f 'udhcpc .*-i $IF' > /dev/null" 5 ||
+		echo "wifi-up: wpa_supplicant/udhcpc still running" >&2
+	[ -e /sys/class/net/$IF ] && ip link set $IF down
+	[ -e /dev/wmtWifi ] && echo 0 > /dev/wmtWifi
+	echo "wifi off"; exit 0
+fi
+
+[ -f /etc/firmware/WIFI_RAM_CODE ] || die "no /etc/firmware (run tools/wifi-deploy.sh on the host)"
+# 1. WMT core + WiFi char devices (built-in drivers, registered on request)
+if [ ! -e /dev/stpwmt ]; then
+	wmt_loader > $L/loader.log 2>&1 || die "wmt_loader failed, see $L/loader.log"
+	wait_for '[ -e /dev/stpwmt ] && [ -e /dev/wmtWifi ]' 5 || die "no /dev/stpwmt after wmt_loader"
+fi
+# 2. launcher: powers CONSYS and hands the ROM patches to the driver; stays running
+if ! pgrep -f stp_uart_launcher > /dev/null; then
+	setsid stp_uart_launcher -p /etc/firmware < /dev/null > $L/launcher.log 2>&1 &
+	sleep 5
+fi
+[ "$1" = core ] && { echo "WMT core up"; exit 0; }
+# 3. WiFi function: firmware download, netdev
+if [ ! -e /sys/class/net/$IF ]; then
+	echo 1 > /dev/wmtWifi || die "WiFi power on failed (dmesg)"
+	wait_for "[ -e /sys/class/net/$IF ]" 10 || die "no $IF"
+fi
+ip link set $IF up || die "ip link set $IF up failed"
+echo "$IF up, MAC $(cat /sys/class/net/$IF/address)"
+[ $# -eq 0 ] && exit 0
+
+# 4. join
+if [ "$1" = join ]; then
+	CONF=$SAVED
+	[ -f $CONF ] || die "no $CONF (wifi-up save <ssid> <password>)"
+else
+	[ $# -eq 2 ] || die "usage: wifi-up [off | join | save <ssid> <password> | <ssid> <password>]"
+	CONF=$L/wpa.conf
+	(umask 077; wpa_passphrase "$1" "$2" | grep -v '#psk' > $CONF) || die "wpa_passphrase failed"
+fi
+pkill -f "wpa_supplicant .*-i $IF" 2>/dev/null && wait_for "! pgrep -f 'wpa_supplicant .*-i $IF' > /dev/null" 5
+# Alpine's wpa_supplicant has no -f; keep its output
+setsid wpa_supplicant -t -i $IF -c $CONF -D nl80211 < /dev/null > $L/wpa.log 2>&1 &
+wait_for "iw dev $IF link | grep -q Connected" 30 || die "not associated, see $L/wpa.log"
+iw dev $IF link | sed -n 's/^\t\(SSID\|freq\|signal\): /  \1 /p'
+# udhcpc stays running to renew the lease
+pkill -f "udhcpc .*-i $IF" 2>/dev/null
+setsid udhcpc -f -i $IF -t 5 -A 10 < /dev/null > $L/udhcpc.log 2>&1 &
+wait_for "ip -4 addr show $IF | grep -q inet" 20 || die "no DHCP lease, see $L/udhcpc.log"
+ip -4 addr show $IF | sed -n 's/^ *inet \([^ ]*\).*/  address \1/p'

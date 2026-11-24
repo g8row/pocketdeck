@@ -1,307 +1,200 @@
-# PocketDeck restructure plan
+# PocketDeck restructure plan (v2)
 
-Status: **plan, nothing executed yet.** Written 2026-11-20 against `main` at `a7b76ec`.
+Status: **steps 1–7 done** on branch `repo/restructure` (2026-11-23); 8 (publish) and 9 (pocketjs) pending. v1 (2026-11-20) was reviewed on 2026-11-23 against the repo
+and the live tablet; this version replaces it. Progress is tracked in §9.
 
-Goal: the project becomes **PocketDeck**, a Linux-first product. The path for the device is
-**root → reflash → set U-Boot to boot Linux → start PocketDeck**, and the repo, docs and build files show exactly
-that path. Android stays only as history and as the rollback slot on the tablet.
+Goal: the project becomes **PocketDeck**, a Linux-first product. The device path is
+**back up + root → repartition → U-Boot → Linux → PocketDeck**, and the repo, docs and tooling show exactly that path.
+Android stays as the rollback slot on the tablet and as history in git.
 
-## 1. Decisions (settled)
+## 1. Decisions
 
 | Topic | Decision |
 |---|---|
-| Product / repo name | **PocketDeck**, GitHub repo `g8row/pocketdeck` |
+| Name | **PocketDeck**; GitHub repo renamed in place (`desk-companion` → `pocketdeck`, history and redirects kept) |
 | Daemon | **`deckd`** (was `deskd`) |
-| UI app | **`deck`** (was `desk` app, `apps/desk`); the DECK tile pane keeps its name; **Deck Studio** (was Desk Studio) |
-| Repo strategy | **Rename `desk-companion` in place.** History, tags and redirects are kept. No new repo |
-| UI app location | `ui/` in this repo, depending on pocketjs as a submodule (moved out of `pocketjs/apps/desk`) |
-| On-device `tb*` names | **Unchanged for now** (`tbkern_a`, `tbroot_a`, `tbdata`, `tbstate`, `tb-reboot`, `tb.sh`…). Renaming means changing the flashed GPT and hard-coded U-Boot, which risks a brick. Separate project, see §11 |
-
-Open assumption: "deck" in the decision was read as "the UI app/pane is called deck". If the DECK tile pane should
-be renamed instead, only §3 and `ui/` change.
+| UI app | **`deck`**; **Deck Studio** (was Desk Studio). The app stays in the pocketjs submodule until pocketjs has a Linux host (§7) |
+| On-device service | `pocketjs` → **`pocketdeck-ui`** (OpenRC). `/opt/pocketjs` and the binary name stay for now |
+| On-device `tb*` names | **Unchanged** (`tbkern_a`, `tbroot_a`, `tbdata`, `tbstate`, `tb-reboot`, …): they are in the flashed GPT and U-Boot. `tb` = TB-7304X, stable on purpose |
+| History | **Not copied.** Superseded docs are deleted from the tree and stay readable at tag `android-era-final`; `docs/history/README.md` lists them, `docs/dev/lessons.md` keeps what they taught |
+| Machines | No host names, user paths, LAN addresses or personal keys in the repo. Per-developer settings live in an untracked `.pd.env` |
 
 ## 2. Principles
 
-1. Linux is the main path. Nothing in the top level of the repo, the README or `docs/install/` is Android-first.
-2. One status file. One ordered install path. Everything dated or superseded goes to `docs/history/`.
-3. Every stage of the device path has: a doc, a command, a "you are here / you need / you end with" header.
-4. `main` always matches something that was tested on the device.
-5. History is preserved (`git mv`, no squash). The Android era is reachable by tag and under `archive/android/`.
-6. Nothing renamed on the device side without a tested recovery path (§11).
+1. Linux is the main path. Nothing at the top of the README or in `docs/install/` is Android-first.
+2. One live status file, one ordered install path, one lessons file.
+3. Every install stage has a doc, a `pd` command and a "you are here / you need / you end with" header.
+4. `main` only moves to states that were tested on the device.
+5. History preserved: moves are renames git can follow; merge commit, no squash.
+6. Nothing on the device is rewritten without a tested way back. New images go to the **inactive slot** first.
 
 ## 3. Vocabulary
 
-| Old | New | Notes |
-|---|---|---|
-| desk-companion | **pocketdeck** | repo, README title, docs |
-| deskd | **deckd** | dir, package name, log file, env vars (`DESKD_*` → `DECKD_*`, keep old as fallback for one release), systemd unit |
-| apps/desk (Desk app) | **ui/** (app name `deck`) | |
-| Desk Studio | **Deck Studio** | |
-| `deskconfig.ts`, `desk.json`-style files | `deckconfig.ts` etc. | rename with the daemon |
-| kiosk, `pocketjs-kiosk` | **PocketJS Linux host**, binary **`pocketjs-linux`** | OpenRC service `pocketjs` → `pocketdeck-ui` |
-| `hosts/android` building the Linux binary | `hosts/linux` (DRM/KMS) + `hosts/android` (frozen) | change is in the pocketjs repo |
-| mainline/ | **device/** | "mainline" only meant "not Android" |
-| "dual boot", plan-dualboot | **boot chain** | U-Boot → Linux (default), Android (recovery slot, rollback) |
-| debloat/, kiosk/, backup/, Android host notes | **archive/android/** | history only |
-| LOG.md, PLAN-*.md, plan-boot-recovery.md, handoffs | **docs/history/** | |
-| `tools/` (Mac-side helper scripts) | `tools/` | stays; the bring-up scripts from `mainline/scripts` move here |
-
-Terminology to retire in prose: "kiosk mode", "Android mode", "mainline" as a name for the system, "desk-companion",
-"companion".
+| Old | New |
+|---|---|
+| desk-companion, "desk companion" | **pocketdeck**, PocketDeck |
+| deskd, `DESKD_*`, `desk.config.json`, `x-desk-token` | **deckd**, `DECKD_*` (old names read as fallback for one release), `deck.config.json` (old file read as fallback), `x-deck-token` |
+| kiosk (Linux), "kiosk mode" | **Linux host** / **UI**; the binary stays `pocketjs-kiosk` until pocketjs renames it (§7) |
+| mainline/ | **device/** ("mainline" only meant "not Android") |
+| dual boot, plan-dualboot | **boot chain** |
+| debloat/, kiosk/ (Android) | **archive/android/** |
+| LOG.md, PLAN-*.md, plan-boot-recovery.md, handoffs, TEST-PLAN | deleted; listed in `docs/history/README.md` |
 
 ## 4. Target layout
 
 ```
 pocketdeck/
-├─ README.md                  what it is, one screenshot, the 5-stage path, links
-├─ LICENSE
-├─ pd                         single CLI entry point (§6)
+├─ README.md            what it is, screenshot, the stage table, links
+├─ CLAUDE.md            agent/contributor quick reference: commands, hazards, where things are
+├─ pd                   the CLI (§6)
 ├─ docs/
-│  ├─ index.md                map of all docs
-│  ├─ install/                the ordered path
-│  │  ├─ 00-prerequisites.md
-│  │  ├─ 01-backup-unlock-root.md
-│  │  ├─ 02-reflash.md
-│  │  ├─ 03-uboot.md
-│  │  ├─ 04-linux.md
-│  │  ├─ 05-pocketdeck.md
-│  │  └─ recovery.md
-│  ├─ hardware/
-│  │  ├─ status.md            THE live status (was docs/mainline/STATUS.md)
-│  │  └─ research-*.md        display, power, rootfs, wifi, poweroff, lk-bootflow
-│  ├─ architecture/
-│  │  ├─ boot-chain.md        (from plan-dualboot.md, rewritten as current design)
-│  │  ├─ partition-layout.md
-│  │  ├─ deckd-protocol.md    (from deskd/protocol.ts + README)
-│  │  └─ ui.md
-│  ├─ dev/
-│  │  ├─ build.md             kernel, U-Boot, rootfs, ui, deckd
-│  │  ├─ ramboot.md           RAM boots, the 60 s rule
-│  │  ├─ test-plan.md         (from mainline/TEST-PLAN.md)
-│  │  └─ conventions.md       branches, commits, docs rules (§8, §9)
-│  └─ history/
-│     ├─ README.md            what each file is and why it is no longer current
-│     ├─ LOG.md
-│     ├─ PLAN-overnight.md
-│     ├─ plan-boot-recovery.md
-│     └─ handoff-uboot-2026-11-17.md
-├─ device/                    everything that is flashed to the tablet
-│  ├─ bootloader/             u-boot/ (patches, config), LK notes + lk_image_check.py
-│  ├─ kernel/                 patches/, dts/, config, wcn/ (MT6625L), gpu/ (Mesa build)
-│  ├─ initramfs/              stage 1 (init, boot menu, health record)
-│  ├─ rootfs/                 build-rootfs.sh, overlay/, tools/
-│  └─ partitions/             GPT layout, stock-partition notes
-├─ deckd/                     Bun daemon: providers, actions, hooks, Deck Studio, linux/ service
-├─ ui/                        PocketJS app "deck" (panes, tiles)
-├─ vendor/
-│  └─ pocketjs/               submodule (framework, hosts/linux)
-├─ tools/                     host scripts: tb.sh, ramboot.sh, linux-test.sh, mlsh.py, fb2png.py, fbusb…
-└─ archive/
-   └─ android/                debloat/, kiosk/, backup/, ONBOARDING (Android), android host notes, README
+│  ├─ index.md          one line per doc
+│  ├─ install/          00-prerequisites … 05-pocketdeck, recovery.md
+│  ├─ hardware/         status.md (THE live status), research-*.md
+│  ├─ architecture/     boot-chain.md (deckd is documented in deckd/README.md)
+│  ├─ dev/              build.md, workflow.md (RAM boots, slots, deploy loop), lessons.md, conventions.md
+│  ├─ assets/           screenshots/, boot-screens/
+│  └─ history/README.md retired docs and how to read them (`git show android-era-final:<path>`)
+├─ device/              everything that ends up on the tablet; same inner layout as mainline/ had, so the
+│  │                    Docker build (mounted at /m) keeps its paths
+│  ├─ build/            Dockerfile, build.sh, build-in-docker.sh, wcn-build.sh
+│  ├─ analysis/         lk_image_check.py, fb_send.py, LK disassembly helpers, memtest.c
+│  ├─ dts/ patches/ initramfs/ u-boot/ rootfs/ gpu/ wcn/ wcn-tools/ stock/
+│  └─ out/ src/         build outputs and source checkouts (gitignored)
+├─ deckd/               Bun daemon, Deck Studio, hooks, linux/ (systemd user unit)
+├─ pocketjs/            submodule (framework, hosts, the `deck` app in apps/desk until §7)
+├─ tools/               host-side scripts: tb.sh, ramboot.sh, tb-install.sh, linux-test.sh, pocketjs-deploy.sh,
+│                       wifi-deploy.sh, tablet-net.sh, http-proxy.py, mlsh.py, fb2png.py, fbusb, tb-gpt.py,
+│                       bootscreens/, pane-perf.sh
+├─ backup/              local device dumps (gitignored; build input for stock DTB/firmware, never published)
+└─ archive/android/     debloat/ (Magisk module, package lists), kiosk/ (Android kiosk), README.md
 ```
 
-Build outputs (`device/out/`, kernel/U-Boot source checkouts) stay gitignored as today. Mapping of every current
-path:
+Changes from v1, and why:
+- `device/` keeps mainline's flat inner layout instead of `kernel/`, `bootloader/`, `partitions/`: the Docker build
+  hard-codes `/m/patches`, `/m/u-boot`, `/m/scripts/analysis`…; flat means pure moves with a handful of path edits.
+- The submodule stays at `pocketjs/` and the app stays inside it until pocketjs has `hosts/linux`; moving it twice
+  costs more than it buys.
+- `backup/` stays at the top: it is the stage 1 output and the build reads the stock DTB, firmware and NVRAM from it.
+- No `docs/history/` copies (see §1).
 
-| Current | Target |
-|---|---|
-| `README.md` | `README.md` (rewritten) |
-| `docs/ONBOARDING.md` | split into `docs/install/*`; Android parts → `archive/android/ONBOARDING.md` |
-| `docs/mainline/STATUS.md` | `docs/hardware/status.md` |
-| `docs/mainline/research-*.md` | `docs/hardware/research-*.md` |
-| `docs/mainline/plan-dualboot.md` | `docs/architecture/boot-chain.md` (rewritten as present-tense design; old text → `docs/history/`) |
-| `docs/mainline/handoff-uboot-2026-11-17.md` | `docs/history/` |
-| `docs/screenshots/`, `docs/boot-screens/` | `docs/assets/screenshots/`, `docs/assets/boot-screens/` |
-| `mainline/README.md` | split into `docs/dev/build.md`, `docs/dev/ramboot.md`, `docs/history/mainline-bringup-2026-11-16.md` |
-| `mainline/TEST-PLAN.md` | `docs/dev/test-plan.md` |
-| `mainline/patches`, `dts`, `wcn`, `gpu` | `device/kernel/…` |
-| `mainline/u-boot`, `mainline/stock` | `device/bootloader/…`, `device/partitions/…` |
-| `mainline/initramfs`, `mainline/rootfs` | `device/initramfs`, `device/rootfs` |
-| `mainline/scripts` | `tools/` (build scripts that belong to one component go with it: `wcn-build.sh` → `device/kernel/`) |
-| `mainline/wcn-tools` | `device/kernel/wcn-tools` |
-| `mainline/out`, `mainline/src` | `device/out`, `device/src` (gitignored) |
-| `deskd/` | `deckd/` |
-| `pocketjs/` (submodule) | `vendor/pocketjs/` |
-| `pocketjs/apps/desk` | `ui/` (in this repo) |
-| `debloat/`, `kiosk/`, `backup/` | `archive/android/…` |
-| `LOG.md`, `PLAN-overnight.md`, `plan-boot-recovery.md` | `docs/history/` |
-| `tools/bootscreens`, `tools/pane-perf.sh` | `tools/` (unchanged) |
+## 5. The device path
 
-## 5. The device path (what the docs and `pd` present)
-
-| Stage | Goal | Doc | Command | Output / done when |
+| Stage | Goal | Doc | Command | Done when |
 |---|---|---|---|---|
-| 0 | Host ready | `00-prerequisites.md` | `pd doctor` | all checks green (Bun, Rust+musl target, Docker, python+pyusb, fastboot tooling) |
-| 1 | Back up, unlock bootloader, root | `01-backup-unlock-root.md` | `pd backup`, `pd root` | full dump on the host; Magisk root in the Android slot |
-| 2 | Reflash the partition layout | `02-reflash.md` | `pd flash layout` | `tbkern_a`, `tbroot_a`, `tbdata`… exist (GPT verified) |
-| 3 | U-Boot in `boot`, set to boot Linux | `03-uboot.md` | `pd flash uboot`, `pd boot default linux` | U-Boot menu appears; boot record says Linux default |
-| 4 | Linux installed | `04-linux.md` | `pd build all`, `pd install kernel`, `pd install rootfs` | Alpine boots from eMMC, reaches `healthy` |
-| 5 | PocketDeck running | `05-pocketdeck.md` | `pd deploy`, `pd deckd` | UI on screen, deckd connected, hot reload works |
-| – | Rollback | `recovery.md` | `pd reboot android`, `pd state` | Android in `recovery`, boot counter explained |
+| 0 | Host ready | `00-prerequisites.md` | `pd doctor` | all checks green |
+| 1 | Backup, unlock, root | `01-backup-unlock-root.md` | mtkclient + Magisk (manual; `pd doctor` checks the backup) | full dump in `backup/partitions`, Magisk root |
+| 2 | Repartition | `02-repartition.md` | `tools/tb-gpt.py` (manual, documented) | `tb*` partitions in the GPT |
+| 3 | U-Boot in `boot` | `03-uboot.md` | `pd build uboot`, `pd flash uboot` | U-Boot → Linux by default, Android in `recovery` |
+| 4 | Linux installed | `04-linux.md` | `pd build`, `pd install kernel rootfs` | Alpine from eMMC reaches `healthy` |
+| 5 | PocketDeck | `05-pocketdeck.md` | `pd deploy`, `pd deckd` | UI on screen, deckd connected |
+| – | Rollback | `recovery.md` | `pd reboot android`, `pd slot a`, `pd state` | back to a known-good state |
 
-Each stage doc begins with:
+Stages 1–3 are one-time and dangerous; they stay documented step-by-step rather than hidden behind one command.
 
-```
-Stage N of 5 · you are here: <one line> · you need: <inputs> · you end with: <verifiable result>
-Previous: <link> · Next: <link> · If it fails: recovery.md#<anchor>
-```
+## 6. `pd`
 
-Stage 1 note: rooting is only needed to reach the point where the partitions can be rewritten and U-Boot flashed.
-The doc states exactly which later stage depends on it, and that the Android slot stays as rollback.
-
-## 6. The `pd` CLI
-
-A single POSIX-shell (or Bun, decide in implementation; default: shell, no dependency) script at the root. It wraps
-existing scripts, adds no new logic of its own beyond argument checking, preconditions and clear errors. It must be
-runnable from any directory.
+POSIX shell at the repo root, runnable from anywhere, wrapping the existing scripts (no new logic beyond argument
+checks, preconditions and clear errors). Settings from the environment or the untracked `.pd.env`:
+`TAB` (tablet ssh target, default `root@172.16.42.1`), `PD_BUILD_HOST` / `PD_BUILD_DIR` (remote Docker host for
+kernel/U-Boot/rootfs/Mesa builds; unset = local Docker).
 
 ```
-pd doctor                      check host tools and device connectivity
-pd backup                      full partition dump (mtkclient)         -> stage 1
-pd root                        unlock + Magisk                         -> stage 1
-pd flash layout|uboot          partition table / U-Boot                -> stages 2, 3
-pd build kernel|rootfs|ui|deckd|all
-pd ramboot                     RAM-boot the current kernel (waits 60 s before checks)
-pd install kernel|rootfs       to the inactive slot, with backup       -> stage 4
-pd deploy                      build ui + pocketjs-linux, push, restart service  -> stage 5
-pd deckd [--dev]               run the daemon (or install the service on Linux)
-pd boot default linux|android  boot record
-pd reboot linux|android|uboot|bootloader
-pd state                       boot record, slot, health, boot counter
-pd log                         tail device logs
+pd doctor                         host tools, submodule, backup, tablet reachability
+pd ssh [cmd]                      shell / command on the tablet
+pd state                          boot record, running slot, kernel, release info, services
+pd log [ui|kernel|deckd]          tail logs
+pd build [kernel|uboot|wcn|rootfs|mesa|all]   local Docker, or PD_BUILD_HOST (rsync, build, fetch device/out)
+pd ramboot [image]                RAM-boot via U-Boot fastboot (nothing written)
+pd install kernel|rootfs [--slot a|b] [--yes]  default slot: the inactive one
+pd slot a|b                       which slot U-Boot boots next (record), resets attempts
+pd deploy [manifest]              build + push the UI, restart pocketdeck-ui
+pd deckd [--install]              run deckd here, or install it as a systemd user service
+pd boot default linux|android
+pd reboot linux|android|android-direct|uboot|bootloader
+pd flash uboot [--yes]            U-Boot image to `boot` via LK fastboot, after lk_image_check
 ```
 
-Mapping to today's scripts: `build.sh`/`build-in-docker.sh` → `build`; `ramboot.sh` → `ramboot`; `tb-install.sh` →
-`install`; `pocketjs-deploy.sh` → `deploy`; `linux-test.sh`/`tb.sh` → `state`/`reboot`/`boot`. The wrapped scripts keep
-their current names; renaming them is allowed only where the name contains `kiosk`, `mainline` or `desk`.
+Safety: everything that writes flash names the partition and needs `--yes` (or a typed confirmation); `pd install`
+refuses to write the running slot's root; `pd state` explains the attempt counter.
 
-Safety rules in `pd`: anything that writes flash prints the target partition and requires `--yes` or an interactive
-confirmation; `pd install` refuses if the boot record shows unhealthy boots until `pd state` is acknowledged; the
-60-second wait after RAM boots (see memory note on boot counters) is built into `pd ramboot`.
+### Slot updates (new; v1 assumed this existed)
+`tb-install.sh` only wrote slot A, so a root update needed a RAM boot and had no rollback. U-Boot, `tbstate` and stage
+1 already support slot B (T9). The update flow becomes:
+1. `pd install kernel rootfs` → writes `tbkern_b` + `tbroot_b` while running from A (no RAM boot), verifies hashes,
+   carries `/opt/pocketjs`, `/etc/firmware` and host keys over from the running root.
+2. `pd slot b && pd reboot linux` → U-Boot boots B. Healthy at 60 s → `last_good_slot=b`.
+3. If B never gets healthy: 3 attempts → `tbrescue` → Android. From Android or rescue: `pd slot a`, `pd reboot linux`.
 
-## 7. Repo, submodule and pocketjs changes
+### Build identity (new)
+Kernel build numbers (`#18`) differ per build machine and were mixed up in the docs. `pd build` passes
+`git describe --dirty` into the kernel (`KBUILD_BUILD_VERSION`, shown by `uname -v`) and writes
+`device/out/BUILDINFO` (describe, kernel commit, image hashes); `pd install` stores it on the tablet as
+`/data/pocketdeck/slot-<x>.buildinfo` and `pd state` prints it. The status doc names builds by describe + date.
 
-### This repo
-- Rename on GitHub: `desk-companion` → `pocketdeck`. Update `origin` locally. Old URLs redirect.
-- Tag the last pre-restructure commit `android-era-final` before any move (§10, step 1).
-- `.gitmodules`: `pocketjs` → `vendor/pocketjs`, `branch = main` once the Linux host is merged there.
-- `private-history` stays local and unpushed. Verify with `git branch -r` before any push of branches.
+## 7. pocketjs (separate repo, separate PRs; no longer gates this restructure)
 
-### pocketjs repo (separate repo, separate PR; this is a prerequisite)
-- Add `hosts/linux`: the DRM/KMS host and musl build, binary `pocketjs-linux`. Move the Linux-specific code out of
-  `hosts/android/src/kiosk.rs`, `kiosk_drm.rs`.
-- Leave `hosts/android` buildable but marked frozen in its README.
-- Rename `kiosk` in `contracts/spec/pocket-manifest.ts`, `contracts/spec/platforms.ts`, `docs/WIDGET.md` (platform id
-  `linux`).
-- Merge `android-host` into pocketjs `main` once the above is done; PocketDeck's submodule then tracks `main`.
-- Move `apps/desk` into PocketDeck `ui/`. The pocketjs `pocket.config.ts` / `pocket.json` project wiring needs a
-  matching `ui/pocket.config.ts` that points to `vendor/pocketjs` as the framework root. Prove this builds before
-  deleting the original (keep it in pocketjs until the PocketDeck build is verified).
+- `hosts/linux`: the DRM/KMS host and musl build from `hosts/android/src/kiosk*.rs`, binary `pocketjs-linux`.
+- Platform id `kiosk` → `linux` in `contracts/spec/*`, `docs/WIDGET.md`.
+- Merge `android-host` into pocketjs `main`; the submodule then tracks `main`.
+- Then, in this repo: `apps/desk` → `ui/` (app `deck`) building against the submodule, the deploy script and deckd's
+  watcher pointed at `ui/`, binary rename in `pocketdeck-ui`. Check: same bundle bytes as before the move.
 
-## 8. Branch and tag conventions
+## 8. Conventions
 
-- `main`: stable; every commit reachable from a tag that was tested on the device is marked in `docs/hardware/status.md`.
-- Working branches, short-lived, one purpose, deleted after merge:
-  `feat/<area>-<thing>`, `fix/<area>-<thing>`, `bringup/<hardware>`, `docs/<topic>`, `chore/<topic>`.
-  Areas: `ui`, `deckd`, `kernel`, `boot`, `rootfs`, `tools`, `docs`.
-- Frozen: `archive/android-era` (= tag `android-era-final`), `archive/mainline-bringup` (renamed from `mainline-bringup`).
-- Releases: `v0.1.0` = first tagged state after the restructure is verified on the device. Release notes list what was
-  verified (kernel build number, rootfs image hash, U-Boot image hash).
-- Existing tags `bootscreens-ridge-1`, `mainline-test-1`, `stock-partitions-1` stay as they are (they are referenced
-  from docs). New firmware-level tags: `fw/<component>-<n>`.
-- Commit subject prefixes: `kernel:`, `boot:`, `rootfs:`, `ui:`, `deckd:`, `tools:`, `docs:`, `repo:`. Matches the
-  existing style (`power:`, `display:`, `docs:`) with a fixed set.
+- Branches: `feat/<area>-<thing>`, `fix/…`, `bringup/<hardware>`, `docs/…`, `chore/…`, short-lived.
+  Frozen: `archive/mainline-bringup` (renamed from `mainline-bringup`), tag `android-era-final`.
+- Commit prefixes: `kernel:` `boot:` `rootfs:` `ui:` `deckd:` `tools:` `docs:` `repo:` (plus hardware areas already
+  in use: `power:`, `display:`, `wifi:`, `bluetooth:`).
+- Tags: existing `bootscreens-ridge-1`, `mainline-test-1`, `stock-partitions-1` stay (scripts download from them).
+  Releases `v0.N.0` after device verification; notes list the BUILDINFO of what was tested.
+- Docs: one live status file stating the build it was verified on; research notes start with
+  `Status: current | superseded`; no dated filenames; adding a doc means a line in `docs/index.md`; install docs
+  use `pd` commands only.
 
-## 9. Docs rules
+## 9. Execution and progress
 
-1. **One live status file**: `docs/hardware/status.md`. It always states the kernel build and date it was verified on.
-2. Research notes carry a header `Status: current | superseded by <link>`; superseded ones move to `docs/history/`.
-3. No dated filenames outside `docs/history/`.
-4. Install docs contain only commands that `pd` also runs, so doc and tooling cannot drift; `pd` is the source of
-   truth for flags.
-5. README top section: what it is (2 lines), the 5-stage path as a table with links, one screenshot. Nothing about
-   Android above the "History" heading.
-6. `docs/index.md` lists every doc in one line each. Adding a doc means adding a line.
-7. Android material is always labelled "archive" in its path, never in the install path.
-8. Rewrite, don't patch: `docs/architecture/boot-chain.md` is written fresh as the present design from
-   `plan-dualboot.md`, `research-lk-bootflow.md` and `STATUS.md`.
+| # | Step | Needs | State |
+|---|---|---|---|
+| 1 | Freeze: local tag `android-era-final` at the pre-restructure `main`; rename `mainline-bringup` → `archive/mainline-bringup` locally | – | done: tag `android-era-final` (local, not pushed), branch renamed |
+| 2 | Retire history docs (delete; `docs/history/README.md`, `docs/dev/lessons.md`) | – | done |
+| 3 | Moves, one commit per top-level move, `.gitignore` updated in the same commit (`mainline/out` is ~600 MB) | – | done (`git log --follow` checked) |
+| 4 | Path fixes after the moves, then renames (deskd → deckd, env/config fallbacks, kiosk/mainline prose, service name); update local Claude Code hook paths | – | done; hooks updated; `pocketdeck-ui` deployed and verified on the tablet 2026-11-23 |
+| 5 | `pd`, `.pd.env.example`, slot-B install, build identity | – | done (`pd state`, `pd doctor`, `pd deploy` used against the tablet; build/install not yet run) |
+| 6 | Docs: README, CLAUDE.md, index, install/, architecture/, dev/, compacted status + research; CI (deckd tests, shellcheck, link check, stale-name grep) | – | done; `tools/check-repo.sh` passes, deckd tests pass |
+| 7 | Device verification (§10): build, install to slot B, boot B, deploy, deckd | user OK (writes flash) | done 2026-11-23: `pd build kernel`/`rootfs` on the build host (`ae95761`), `pd install` → slot B, B healthy in 84 s; rollback A (85 s) and back; Android round trip (normal mode, root) and back; UI + deckd link on B |
+| 8 | Publish: push tag + branches, GitHub rename, `git remote set-url`, merge (no squash), `v0.1.0` | user OK (public) | |
+| 9 | pocketjs work (§7) | separate | |
 
-## 10. Execution order
+On the build machine after step 3: move its `mainline/` checkout to `device/` (or let `pd build` rsync a fresh one;
+the kernel/U-Boot objects live in Docker volumes and survive either way).
 
-Each step ends in a commit (or a PR in the named repo) and a check. Do them in order.
+## 10. Definition of done
 
-1. **Freeze.** On `main`: tag `android-era-final`, push the tag. Create `archive/android-era` and
-   `archive/mainline-bringup` (rename existing). Confirm `private-history` is not on the remote.
-2. **pocketjs prerequisites** (pocketjs repo): `hosts/linux`, `pocketjs-linux` binary, platform id rename, merge to
-   its `main`. Check: `hosts/linux` builds the musl binary and the RAM-booted tablet runs it.
-3. **GitHub rename** `desk-companion` → `pocketdeck`; `git remote set-url origin …`. Check: `git fetch` works, old URL
-   redirects.
-4. **Branch `repo/restructure`**. Pure moves first, no content edits, one commit per top-level move so `git log
-   --follow` keeps working: `docs/`, `device/`, `deckd/`, `tools/`, `archive/android/`, `docs/history/`,
-   `vendor/pocketjs`. Check: `git status` shows renames only; `git diff -M --stat` has near-zero content change.
-5. **Mechanical renames** via a script kept at `docs/history/restructure-rename.sh` (dry-run default, `--apply`):
-   - `deskd` → `deckd`, `DESKD_` → `DECKD_` (with one-release fallback in config loading), `desk-companion` →
-     `pocketdeck`, `Desk Studio` → `Deck Studio`;
-   - `pocketjs-kiosk` → `pocketjs-linux`, remaining `kiosk` → `host`/`ui` by context (review the ~161 hits across
-     ~30 files by hand; the script only lists them);
-   - `mainline/` path references → `device/…`, `docs/mainline/` → `docs/hardware/`.
-   Files touched include the tablet-side service (`rootfs/overlay/etc/init.d/pocketjs`,
-   `conf.d/pocketjs` → `pocketdeck-ui`), `build-rootfs.sh`, `tools/pocketjs-deploy.sh`, `deckd/providers/tablet.ts`,
-   `deckd/transport.ts`, `deckd/linux/*`, `.gitignore`. Check: `grep -rIi 'kiosk\|deskd\|desk-companion\|mainline/'
-   --exclude-dir=.git --exclude-dir=archive --exclude-dir=history .` returns only intentional hits.
-6. **Move the UI app**: `pocketjs/apps/desk` → `ui/`; make it build against `vendor/pocketjs`. Check: `pd build ui`
-   produces the same bundle as before (diff the output).
-7. **Write `pd`** and `pd doctor`; port the existing scripts behind it. Check: every subcommand has `--help`; dry-run
-   output for the flash commands shows the partitions without writing.
-8. **Write docs**: README, `docs/index.md`, `install/00…05`, `recovery.md`, `architecture/*`, `dev/*`,
-   `history/README.md`, `archive/android/README.md`. Reuse text from the current docs; do not carry over Android-first
-   framing. Check: a fresh reader can follow stage 0 → 5 using only `docs/install/` (see §12).
-9. **Device verification** (see §12). Rootfs must be rebuilt and reinstalled because the on-device service and paths
-   change (`pocketjs` → `pocketdeck-ui`, `/opt/pocketjs` paths). Keep the old installed root as fallback until verified;
-   the boot counter will drop to Android after 3 unhealthy boots, so follow the 60 s rule.
-10. **Merge and release**: merge `repo/restructure` into `main` (merge commit, not squash, to keep the per-move history),
-    tag `v0.1.0`, update the Status header.
+- [x] `git log --follow` works on a moved file per top-level move
+- [x] stale-name grep is clean outside `archive/` and `docs/history/`
+- [x] `bun test` in deckd passes; `pd --help` and every subcommand's `--help` work; `pd doctor` passes
+- [x] `pd build all` completes (local Docker or `PD_BUILD_HOST`), `uname -v` shows the describe
+- [x] `pd install kernel rootfs` → slot B; `pd slot b`; reboot; `healthy` with `last_good_slot=b`
+- [x] `pd deploy`: UI at 60 Hz, `pocketdeck-ui` starts on boot, old `pocketjs` service gone
+- [ ] `pd deckd`: connects, a tile action runs on the host, hot reload works; Claude Code hooks reach deckd
+- [x] Rollback: `pd slot a` boots A again; `pd reboot android` and back
+- [ ] A new reader can follow `docs/install/` 0 → 5 without history docs; all links resolve
+- [x] No host names, user paths, LAN addresses or keys in the tree (grep in CI)
 
-## 11. Deferred: renaming on-device identifiers
-
-Not part of this plan. Candidates: GPT partition names `tbkern_a`/`tbroot_a`/`tbdata`, `tbstate`, `tb-reboot`,
-`tb.sh`, `/opt/pocketjs`. Reason to defer: they are in the flashed GPT, U-Boot's environment/scripts and the boot
-record; a mistake bricks the boot path. If done later: do it as a new slot-B style migration (create new names, boot
-from them, then drop the old), with `pd` knowing both name sets for one release. Until then the docs state once, in
-`docs/architecture/partition-layout.md`, that `tb` = "TB-7304X" and these names are stable on purpose.
-
-## 12. Verification checklist (definition of done)
-
-- [ ] `git log --follow` works on a moved file from each top-level move (e.g. `device/kernel/patches/…`, `deckd/main.ts`)
-- [ ] grep check from §10 step 5 is clean
-- [ ] `pd doctor` passes on the Mac and on the build host (taos)
-- [ ] `pd build all` completes on both
-- [ ] `pd ramboot` boots, waits 60 s, `pd state` shows healthy
-- [ ] `pd install rootfs` completes; reboot; tablet reaches `healthy` from the eMMC
-- [ ] `pd deploy`: UI on screen at 60 Hz, `pocketdeck-ui` service starts on boot
-- [ ] `pd deckd`: deckd connects, a tile action runs on the Mac, UI hot reload works (~2 s)
-- [ ] Rollback: `pd reboot android` and back to Linux
-- [ ] Docs: someone who has not seen the project follows `docs/install/` stage 0 → 5 without needing history docs
-- [ ] README links all resolve (check with a link checker)
-- [ ] `docs/hardware/status.md` header shows the verified kernel build and date
-- [ ] Old GitHub URL redirects; submodule clones with `git clone --recurse-submodules`
-
-## 13. Risks
+## 11. Risks
 
 | Risk | Mitigation |
 |---|---|
-| Moves break the rootfs build or scripts that use relative paths | Do pure moves first (§10 step 4), then fix paths in step 5; `pd build all` is the check |
-| Service rename leaves the tablet without a UI | Keep the old root installed until verified; ramboot first; the boot counter returns to Android on failure |
-| Boot counter trips during testing (3 quick reboots → Android) | 60 s rule in `pd ramboot`; recovery steps in `recovery.md` |
-| pocketjs changes block this repo | pocketjs prerequisites are step 2 and gate the rest; the UI move (step 6) comes after |
-| Broken doc links after moves | Link check in §12; `docs/index.md` is the map |
-| History lost to bulk rename | `git mv` only, merge commit not squash, rename script is reviewed with dry run |
-| Secrets or personal paths in history docs | Skim `docs/history/` and `archive/` before the public push; `private-history` stays unpushed |
-| `DESKD_*` env vars break an existing setup | One-release fallback to old names with a deprecation warning |
+| Moving `mainline/` drags untracked build output into a commit | `.gitignore` changes in the same commit; `git status` must show renames only |
+| Moving `deskd/` breaks the Claude Code hooks (absolute paths) | hook paths updated in the same step; `claude-hook.sh` never blocks anyway |
+| Service rename leaves the tablet without a UI | deploy installs the new service before removing the old one; tested with `pd deploy` before any rootfs install |
+| New root/kernel does not boot | written to slot B only; A untouched; 3-attempt fallback to rescue → Android; `pd slot a` |
+| Boot counter trips during testing | wait for `healthy` (60 s) between reboots; `pd state` shows attempts |
+| Renaming wire/config names breaks a running setup | fallbacks for `DESKD_*` and `desk.config.json` for one release |
+| Personal data in published history | retired docs are deleted from the tree; before the public push, review tag contents; CI grep for host names/paths |
 
-## 14. Out of scope
+## 12. Out of scope
 
-- Renaming the on-device `tb*` identifiers (§11)
-- New features in the UI or daemon (the restructure is the prerequisite for working on them robustly)
-- Android host maintenance
-- Supporting other tablets
+Renaming on-device `tb*` identifiers and `/opt/pocketjs`; new UI/daemon features (a DRM screenshot tool for `pd shot`
+is the first follow-up); Android host maintenance; other tablets.

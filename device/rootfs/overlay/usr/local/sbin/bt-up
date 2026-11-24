@@ -1,0 +1,23 @@
+#!/bin/sh
+# Bluetooth on the TB-7304X (MT6625L via CONSYS, the WMT driver's HCI device, device/wcn).
+#   bt-up        WMT core (wifi-up core), BD address from NVRAM (/etc/firmware/nvram/BT_Addr), power on via mgmt
+#   bt-up off    power off
+# Uses btmgmt (bluez-btmgmt). For pairing and profiles run bluetoothd (bluez, needs dbus) on top.
+PATH=/usr/local/sbin:$PATH
+die() { echo "bt-up: $*" >&2; exit 1; }
+command -v btmgmt > /dev/null || die "btmgmt missing (apk add bluez-btmgmt)"
+if [ "$1" = off ]; then btmgmt power off > /dev/null; echo "bluetooth off"; exit 0; fi
+
+wifi-up core > /dev/null || die "WMT core failed (wifi-up core)"
+# hci0 appears in mgmt once its setup power-on worked; the driver re-registers it every 3 s until then
+i=0; while ! btmgmt info 2> /dev/null | grep -q '^hci0'; do
+	i=$((i + 1)); [ $i -ge 40 ] && die "hci0 not ready (dmesg | grep mtk_bt)"; sleep 1
+done
+F=/etc/firmware/nvram/BT_Addr
+if [ -f $F ]; then
+	A=$(od -A n -t x1 -N 6 $F | awk '{ printf "%s:%s:%s:%s:%s:%s", $1, $2, $3, $4, $5, $6 }' | tr a-f A-F)
+	btmgmt power off > /dev/null 2>&1
+	btmgmt public-addr "$A" > /dev/null || echo "bt-up: could not set $A" >&2
+fi
+btmgmt power on > /dev/null || die "power on failed"
+btmgmt info | sed -n 's/^\taddr \([^ ]*\).*/hci0 up, address \1/p'

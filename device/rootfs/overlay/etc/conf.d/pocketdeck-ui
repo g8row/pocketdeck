@@ -1,0 +1,15 @@
+# Power key: "ignore" keeps the UI up (the service would restart it anyway); "exit" ends the process.
+POCKETJS_POWER=ignore
+# deckd address; default 127.0.0.1:7777 (ssh -R 7777:127.0.0.1:7777 root@172.16.42.1 from the host).
+#POCKETJS_LINK=172.16.42.2:7777
+# The cracked glass reports phantom contacts at fixed spots. Rects in raw panel pixels (portrait 600x1024),
+# "x0,y0,x1,y1;...": a contact that STARTS in one is dropped by the PocketJS host for its whole life. Measured
+# 2026-11-17 with nobody touching (~1.4 phantom contacts/s, 96% start in the first rect; the second is one spot
+# at the left edge). In the landscape UI the first rect is logical x 0-62, y 65-115. Empty = no mask.
+POCKETJS_TOUCH_MASK="370,0,470,125;0,105,15,130"
+# A contact held still (within ~20 px) for longer than this is hidden until it lifts, so a stuck phantom contact
+# or a thumb resting on the glass cannot block every other touch (the UI follows one primary contact). 0 = off.
+POCKETJS_TOUCH_STALE_MS=3000
+# Learn phantom spots (the cracked areas move over time): 40 px cells that keep producing contacts which barely move
+# (>= 10 with a 60 s decay) are masked until they go quiet. 1 = on.
+POCKETJS_TOUCH_LEARN=1

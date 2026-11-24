@@ -1,0 +1,76 @@
+# Applied on top of pmaports config-postmarketos-mediatek-mt6735.aarch64 (7.0.10)
+# Keep everything built in, no modules to ship
+# CONFIG_MODULES is not set
+# Do not let mediatek-drm reprogram the display LK left running (no panel driver yet)
+# Real display pipeline (RDMA0 -> DSI0 -> NT51021B). simpledrm keeps LK's framebuffer until it takes over.
+CONFIG_DRM_MEDIATEK=y
+CONFIG_DRM_PANEL_NOVATEK_NT51021B=y
+CONFIG_MTK_LK_FB=y
+CONFIG_DRM_SIMPLEDRM=y
+CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_FB_DEVICE=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_LOGO=y
+CONFIG_LOGO_LINUX_CLUT224=y
+# /dev/mem fallback painter
+CONFIG_DEVMEM=y
+# CONFIG_STRICT_DEVMEM is not set
+# initramfs embedded in the kernel (also shipped as boot.img ramdisk)
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE="/build/initramfs.cpio"
+CONFIG_INITRAMFS_COMPRESSION_GZIP=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_RELOCATABLE=y
+# CONFIG_RANDOMIZE_BASE is not set
+CONFIG_PSTORE=y
+CONFIG_PSTORE_RAM=y
+CONFIG_PSTORE_CONSOLE=y
+CONFIG_WATCHDOG_HANDLE_BOOT_ENABLED=y
+CONFIG_MEDIATEK_WATCHDOG=y
+CONFIG_USB_CONFIGFS=y
+CONFIG_USB_CONFIGFS_ACM=y
+CONFIG_USB_CONFIGFS_ECM=y
+CONFIG_USB_CONFIGFS_RNDIS=y
+CONFIG_LOCALVERSION="-tb7304x"
+# CONFIG_LOCALVERSION_AUTO is not set
+CONFIG_CMDLINE="console=tty0 clk_ignore_unused pd_ignore_unused regulator_ignore_unused maxcpus=1 ignore_loglevel"
+# Input: Goodix GT9xx touch on i2c1, SoC keypad (volume), PMIC power key
+CONFIG_INPUT_EVDEV=y
+CONFIG_INPUT_TOUCHSCREEN=y
+CONFIG_TOUCHSCREEN_GOODIX=y
+CONFIG_KEYBOARD_MT6779=y
+CONFIG_KEYBOARD_MTK_PMIC=y
+# Reboot 10 s after a panic (the cmdline has no room for panic=10). Without it a dead init after switch_root hangs forever.
+CONFIG_PANIC_TIMEOUT=10
+# No usermode-helper firmware fallback: the Goodix driver asks for an optional config file that doesn't exist,
+# and the fallback made it wait 60 s before the touchscreen appeared.
+# CONFIG_FW_LOADER_USER_HELPER is not set
+# Boot time (initcall_debug, kernel #16): the RAID6 algorithm benchmark took 612 ms and ftrace's trace_eval_sync
+# 397 ms of the 1.7 s before /init. Nothing here uses RAID6 (it comes in with btrfs) or tracing.
+# CONFIG_RAID6_PQ_BENCHMARK is not set
+# CONFIG_FTRACE is not set
+# SoC thermal (patches/0009): AUXADC channel 11 + efuse calibration
+CONFIG_MEDIATEK_MT6577_AUXADC=y
+CONFIG_NVMEM_MTK_EFUSE=y
+CONFIG_MTK_SOC_THERMAL=y
+# WiFi: MediaTek CONSYS (MT6737M + MT6625L) through WMT/STP/BTIF + wlan_gen2, out-of-tree driver in device/wcn
+# (patches/0011). Built in, like the stock kernel; nothing is powered until wmt_launcher opens /dev/stpwmt.
+CONFIG_MTK_PLATFORM="mt6735"
+CONFIG_MTK_COMBO=y
+CONFIG_MTK_COMBO_CHIP_CONSYS_6735=y
+CONFIG_MTK_BTIF=y
+CONFIG_MTK_COMBO_WIFI=y
+CONFIG_NL80211_TESTMODE=y
+# MT6328 PMIC AUXADC + fuel-gauge current (patches/0013/0014), battery NTC (ntc_thermistor), charger input
+CONFIG_MT6328_AUXADC=y
+CONFIG_HWMON=y
+CONFIG_SENSORS_NTC_THERMISTOR=y
+# SM5414 charger and the "battery" supply (patches/0015)
+CONFIG_CHARGER_SM5414=y
+CONFIG_IIO_RESCALE=y
+# Bluetooth: the WMT driver's HCI device (stp_chrdev_bt.c with MTK_BT_HCI) for BlueZ
+CONFIG_BT=y
+CONFIG_BT_BREDR=y
+CONFIG_BT_LE=y
+CONFIG_MTK_COMBO_BT=y

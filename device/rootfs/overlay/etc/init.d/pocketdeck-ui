@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+# The PocketDeck UI on the panel (PocketJS Linux host: DRM/KMS + Goodix touch), restarted if it dies.
+# Binary and bundle: /opt/pocketjs (tools/pocketjs-deploy.sh). Options: /etc/conf.d/pocketdeck-ui.
+description="PocketDeck UI (PocketJS Linux host)"
+supervisor=supervise-daemon
+command=/opt/pocketjs/pocketjs-kiosk
+command_args="${POCKETJS_BUNDLE:-/opt/pocketjs/bundle}"
+output_log=/var/log/pocketdeck-ui.log
+error_log=/var/log/pocketdeck-ui.log
+respawn_delay=2
+respawn_max=0
+
+depend() {
+	need localmount
+	after local
+}
+
+start_pre() {
+	[ -x "$command" ] || { eerror "$command missing (run pocketjs-deploy.sh)"; return 1; }
+	export POCKETJS_POWER POCKETJS_LINK POCKETJS_TOUCH_MASK POCKETJS_TOUCH_STALE_MS POCKETJS_TOUCH_LEARN
+	: > "$output_log"
+}

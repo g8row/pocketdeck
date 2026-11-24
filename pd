@@ -1,0 +1,195 @@
+#!/bin/sh
+# pd: the PocketDeck command line. Thin wrapper over tools/ and device/build/; run `pd help`.
+# Settings come from the environment or from .pd.env next to this script (untracked; see .pd.env.example).
+set -eu
+R=$(cd "$(dirname "$0")" && pwd)
+[ -f "$R/.pd.env" ] && . "$R/.pd.env"
+TAB=${TAB:-root@172.16.42.1}; export TAB
+T=$R/tools
+OUT=$R/device/out
+
+die() { echo "pd: $*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+tb() { "$T/tb.sh" "$@"; }
+online() { "$T/tb.sh" true 2>/dev/null; }
+adb_up() { have adb && [ "$(adb get-state 2>/dev/null)" = device ]; }
+confirm() {   # confirm <what>: --yes in $YES, or a typed "yes"
+	[ "${YES:-}" = 1 ] && return 0
+	printf '%s\nType yes to continue: ' "$1"; read -r a; [ "$a" = yes ] || die "aborted"
+}
+version() { git -C "$R" describe --always --dirty --abbrev=7 --match 'v*' 2>/dev/null || echo unknown; }
+# reboot in the background: ssh does not return when the tablet goes away under it
+tb_reboot() { tb "sync; tb-reboot $1" >/dev/null 2>&1 & sleep 3; kill $! 2>/dev/null || true; echo "tb-reboot $1 sent"; }
+# tbstate on Android (adb + Magisk su), pushed from the initramfs build
+adb_tbstate() {
+	[ -f "$OUT/tbstate" ] || die "no $OUT/tbstate (pd build kernel)"
+	adb push "$OUT/tbstate" /data/local/tmp/tbstate >/dev/null && adb shell chmod 755 /data/local/tmp/tbstate
+	adb shell "su -c '/data/local/tmp/tbstate $*'"
+}
+
+usage() { cat <<'EOF'
+pd: PocketDeck command line                                 (docs/index.md, docs/install/)
+
+  pd doctor                          check host tools, checkout, backup, tablet
+  pd ssh [cmd]                       shell / command on the tablet (tools/tb.sh)
+  pd state                           boot record, running slot, builds, UI service
+  pd log ui|kernel|deckd             follow a log
+  pd build [kernel|wcn|rootfs|mesa|all]   kernel = initramfs + kernel + U-Boot + boot images
+                                     (local Docker, or PD_BUILD_HOST / PD_BUILD_DIR)
+  pd ramboot [image]                 RAM-boot via U-Boot fastboot, nothing written
+  pd install kernel|rootfs [--slot a|b] [--yes]   default: the slot not running
+  pd slot a|b|cache                  slot U-Boot boots next (resets the attempt counter)
+  pd boot default linux|android      default OS
+  pd reboot linux|android|android-direct|uboot|bootloader
+  pd deploy [manifest]               build + install the UI (pocketdeck-ui service)
+  pd deckd [--install]               run deckd here / install the systemd user service
+  pd flash uboot [--yes]             U-Boot image to `boot` through LK fastboot (lk_image_check first)
+
+Flash writes ask for confirmation unless --yes. Wait for `healthy` (~60 s) between test reboots:
+3 Linux boots in a row without it send the tablet to rescue, then Android (pd state shows attempts).
+EOF
+}
+
+cmd=${1:-help}; [ $# -gt 0 ] && shift
+for a in "$@"; do [ "$a" = --yes ] && YES=1; done
+case $cmd in
+help|-h|--help) usage ;;
+
+doctor)
+	ok=0
+	chk() { if eval "$2" >/dev/null 2>&1; then echo "  ok    $1"; else echo "  MISS  $1${3:+   ($3)}"; ok=1; fi; }
+	echo "host"
+	chk git "have git"
+	chk "ssh, rsync" "have ssh && have rsync"
+	chk python3 "have python3"
+	chk "bun (deckd, UI build)" "have bun || [ -x \$HOME/.bun/bin/bun ]" "https://bun.sh"
+	chk "cargo + aarch64-unknown-linux-musl (UI host)" "PATH=\$HOME/.cargo/bin:\$PATH rustup target list --installed | grep -q aarch64-unknown-linux-musl" "rustup target add aarch64-unknown-linux-musl"
+	chk "zig (cross C compiler for the UI host)" "have zig || ls -d \$HOME/.local/opt/zig-*/zig || [ -n \"\${ZIG:-}\" ]" "ziglang.org, or set ZIG="
+	if [ -n "${PD_BUILD_HOST:-}" ]; then chk "build host $PD_BUILD_HOST (docker)" "ssh -o BatchMode=yes -o ConnectTimeout=5 $PD_BUILD_HOST docker info"
+	else chk "docker (kernel/rootfs builds)" "docker info" "or set PD_BUILD_HOST in .pd.env"; fi
+	chk "fastboot (U-Boot RAM boots)" "have fastboot"
+	chk "adb (Android side)" "have adb"
+	echo "checkout"
+	chk "pocketjs submodule" "[ -f $R/pocketjs/package.json ]" "git submodule update --init"
+	chk "stock partition backup (backup/partitions)" "ls $R/backup/partitions/*.bin" "stage 1: docs/install/01-backup-unlock-root.md"
+	chk "build outputs (device/out)" "[ -f $OUT/boot-mainline-uboot.img ]" "pd build kernel"
+	echo "tablet"
+	if online; then echo "  ok    ssh $TAB"; tb 'uname -rv; tbstate | grep -E "^(default|slot|attempts|last_good_slot)="' | sed 's/^/        /'
+	elif adb_up; then echo "  ok    adb (Android is running)"
+	else echo "  --    tablet not reachable (USB network 172.16.42.1 / adb)"; fi
+	exit $ok ;;
+
+ssh) exec "$T/tb.sh" "$@" ;;
+
+state)
+	if online; then
+		tb 'echo "kernel: $(uname -rv)"; echo "cmdline slot: $(sed -n "s/.*tb\.slot=\([a-z]*\).*/\1/p" /proc/cmdline)"; echo "uptime: $(uptime)"
+			echo "-- boot record (tbstate)"; tbstate
+			for f in /data/pocketdeck/slot-*; do [ -f "$f" ] && { echo "-- $f"; cat "$f"; }; done
+			echo "-- UI"; rc-service pocketdeck-ui status 2>/dev/null || rc-service pocketjs status 2>/dev/null || echo "no UI service"'
+	elif adb_up; then echo "Android is running"; adb_tbstate
+	else die "tablet not reachable"; fi ;;
+
+log)
+	case ${1:-ui} in
+	ui) exec "$T/tb.sh" 'f=/var/log/pocketdeck-ui.log; [ -f $f ] || f=/var/log/pocketjs.log; tail -n 50 -f $f' ;;
+	kernel) exec "$T/tb.sh" 'dmesg -w' ;;
+	deckd) exec journalctl --user -u deckd -f ;;
+	*) die "pd log ui|kernel|deckd" ;;
+	esac ;;
+
+build)
+	what=${1:-kernel}
+	case $what in kernel|wcn|rootfs|mesa|all) ;; *) die "pd build kernel|wcn|rootfs|mesa|all" ;; esac
+	PD_VERSION=$(version); export PD_VERSION
+	KEY=${PD_SSH_PUBKEY:-$(ls "$HOME"/.ssh/id_ed25519.pub "$HOME"/.ssh/id_rsa.pub 2>/dev/null | head -n1)}
+	steps=$what; [ "$what" = all ] && steps="kernel rootfs"
+	if [ -n "${PD_BUILD_HOST:-}" ]; then
+		H=$PD_BUILD_HOST D=${PD_BUILD_DIR:?set PD_BUILD_DIR (checkout dir on $PD_BUILD_HOST)}
+		echo "▸ sync device/ to $H:$D"
+		ssh "$H" "mkdir -p '$D/device/out' '$D/backup'"
+		rsync -a --delete --exclude /src/ --exclude /out/ --exclude /rootfs/out/ --exclude /gpu/out/ --exclude __pycache__ "$R/device/" "$H:$D/device/"
+		ssh "$H" "[ -d '$D/backup/partitions' ]" || die "$H:$D/backup/partitions missing: copy backup/partitions there once"
+		for s in $steps; do case $s in
+		kernel|wcn) ssh "$H" "cd '$D' && PD_VERSION=$PD_VERSION sh device/build/build.sh $( [ $s = wcn ] && echo wcn )" ;;
+		rootfs) [ -n "$KEY" ] || die "no ssh public key (PD_SSH_PUBKEY)"
+			scp -q "$KEY" "$H:$D/.pd-authorized_keys"      # not in device/out: that is root-owned (Docker)
+			ssh "$H" "cd '$D' && sh device/rootfs/build-rootfs.sh .pd-authorized_keys" ;;
+		mesa) ssh "$H" "cd '$D' && sh device/gpu/build-mesa.sh '${PD_ZIG_TARBALL:?set PD_ZIG_TARBALL (a path on the build host)}'" ;;
+		esac; done
+		echo "▸ fetch outputs"
+		mkdir -p "$OUT" "$R/device/rootfs/out" "$R/device/gpu/out"
+		rsync -a --exclude '*.log' "$H:$D/device/out/" "$OUT/"
+		rsync -aS "$H:$D/device/rootfs/out/" "$R/device/rootfs/out/" 2>/dev/null || true
+		rsync -a "$H:$D/device/gpu/out/" "$R/device/gpu/out/" 2>/dev/null || true
+	else
+		for s in $steps; do case $s in
+		kernel) sh "$R/device/build/build.sh" ;;
+		wcn) sh "$R/device/build/build.sh" wcn ;;
+		rootfs) [ -n "$KEY" ] || die "no ssh public key (PD_SSH_PUBKEY)"; sh "$R/device/rootfs/build-rootfs.sh" "$KEY" ;;
+		mesa) sh "$R/device/gpu/build-mesa.sh" "${PD_ZIG_TARBALL:?set PD_ZIG_TARBALL}" ;;
+		esac; done
+	fi
+	[ -f "$OUT/BUILDINFO" ] && cat "$OUT/BUILDINFO" ;;
+
+ramboot) exec "$T/ramboot.sh" "$@" ;;
+
+install)
+	args=; slot=
+	while [ $# -gt 0 ]; do case $1 in
+		--slot) slot=${2:?--slot a|b}; shift 2 ;;
+		--yes) shift ;;
+		kernel|rootfs) args="$args $1"; shift ;;
+		*) die "pd install kernel|rootfs [--slot a|b] [--yes]" ;;
+	esac; done
+	[ -n "$args" ] || die "pd install kernel|rootfs [--slot a|b] [--yes]"
+	online || die "tablet not reachable over ssh (Linux must be running)"
+	running=$(tb "sed -n 's/.*tb\.slot=\([a-z]*\).*/\1/p' /proc/cmdline")
+	[ -n "$slot" ] || case $running in a) slot=b ;; b) slot=a ;; *) die "running slot '$running': pass --slot a|b" ;; esac
+	confirm "Write$args into slot $slot (tbkern_$slot / tbroot_$slot) on the tablet; running slot: $running."
+	# shellcheck disable=SC2086
+	exec "$T/tb-install.sh" --slot "$slot" $args ;;
+
+slot)
+	s=${1:-}; case $s in a|b|cache) ;; *) die "pd slot a|b|cache" ;; esac
+	if online; then tb "tbstate set slot=$s attempts=0 error=none >/dev/null && tbstate | grep -E '^(slot|attempts|last_good_slot)='"
+	elif adb_up; then adb_tbstate set slot=$s default=linux attempts=0 error=none
+	else die "tablet not reachable"; fi
+	echo "next Linux boot uses slot $s (pd reboot linux)" ;;
+
+boot)
+	[ "${1:-}" = default ] || die "pd boot default linux|android"
+	t=${2:-}; case $t in linux|android) ;; *) die "pd boot default linux|android" ;; esac
+	if online; then tb "tbstate set default=$t >/dev/null && tbstate | grep '^default='"
+	elif adb_up; then adb_tbstate set default=$t
+	else die "tablet not reachable"; fi ;;
+
+reboot)
+	t=${1:-linux}
+	case $t in linux|android|android-direct|uboot|bootloader) ;; *) die "pd reboot linux|android|android-direct|uboot|bootloader" ;; esac
+	if online; then tb_reboot "$t"
+	elif adb_up; then   # leave Android only through linux-test.sh: it waits for boot_completed (Magisk counter)
+		case $t in
+		linux) exec "$T/linux-test.sh" to-linux ;;
+		uboot) exec "$T/linux-test.sh" to-uboot ;;
+		bootloader) exec "$T/linux-test.sh" to-fastboot ;;
+		*) die "Android is already running" ;;
+		esac
+	else die "tablet not reachable"; fi ;;
+
+deploy) exec "$T/pocketjs-deploy.sh" "$@" ;;
+
+deckd)
+	if [ "${1:-}" = --install ]; then exec sh "$R/deckd/linux/install.sh"; fi
+	PATH=$HOME/.bun/bin:$PATH; cd "$R/deckd" && exec bun main.ts ;;
+
+flash)
+	[ "${1:-}" = uboot ] || die "pd flash uboot [--yes]   (other partitions: see docs/install/)"
+	img=${IMG:-$OUT/u-boot-tb7304x.img}
+	[ -f "$img" ] || die "no $img (pd build kernel)"
+	python3 -I "$R/device/analysis/lk_image_check.py" "$img" || die "LK would not boot $img reliably"
+	confirm "Write $img to the tablet's \`boot\` partition (U-Boot) through LK fastboot. The tablet must be in LK fastboot (pd reboot bootloader)."
+	exec "$T/fbusb" "$img" flash:boot ;;
+
+*) usage; exit 2 ;;
+esac

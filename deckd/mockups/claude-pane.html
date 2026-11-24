@@ -1,0 +1,333 @@
+<title>Claude Pane Redesign</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: option A ("Conversation") as a column of 1024×600 tablet screens, one per session state,
+   each with a note on what triggers it and where the data comes from.
+   Single dark theme on purpose: the tablet only runs dark. Tokens mirror deckd/ui/style.css. */
+:root{
+  --ground:#070707;--bg:#0a0a0a;--c1:#141414;--c2:#1d1d1d;--c3:#262626;
+  --line:#222;--line2:#363636;--mute:#8a8a8a;--soft:#b3b3b3;--fg:#ededed;--hi:#fff;
+  --accent:#a8c7fa;--accent-dim:rgba(168,199,250,.12);--on-accent:#0b1d33;
+  --warn:#f5c26b;--warn-dim:rgba(245,194,107,.12);--on-warn:#2b1e05;
+  --ok:#9fd8a8;--ok-dim:rgba(159,216,168,.11);--bad:#ffb4a8;
+  --sans:"Geist",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--ground);color:var(--fg)}
+body{font:400 15px/1.55 var(--sans);-webkit-font-smoothing:antialiased;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 72px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:52px}
+header h1{font-weight:400;font-size:clamp(30px,4vw,44px);letter-spacing:-.035em;margin:0;text-wrap:balance}
+header p{color:var(--soft);max-width:70ch;margin:10px 0 0}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--mute)}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.toc a{font:12.5px var(--mono);color:var(--soft);text-decoration:none;border:1px solid var(--line2);border-radius:999px;padding:5px 12px;display:flex;align-items:center;gap:7px}
+.toc a:hover,.toc a:focus-visible{background:var(--c2);color:var(--hi);outline:none}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:22px}
+.rules div{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--c1);font-size:14px;color:var(--soft)}
+.rules b{display:block;color:var(--fg);font-weight:500;margin-bottom:2px}
+
+.opt{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px;align-items:start;scroll-margin-top:16px}
+@media (max-width:880px){.opt{grid-template-columns:minmax(0,1fr)}}
+.opt h2{font-weight:400;font-size:25px;letter-spacing:-.03em;margin:4px 0 6px}
+.note{color:var(--soft);font-size:14.5px;display:grid;gap:10px;min-width:0}
+.note dl{margin:0;display:grid;gap:8px}
+.note dt{font:12px var(--mono);color:var(--mute);letter-spacing:.06em;text-transform:uppercase}
+.note dd{margin:0}
+.note code{font:13px var(--mono);color:var(--fg);background:var(--c2);padding:1px 5px;border-radius:5px}
+.tag{display:inline-flex;align-items:center;gap:8px;font:12px var(--mono);color:var(--accent);background:var(--accent-dim);border-radius:999px;padding:3px 10px;width:max-content}
+.flag{font:12.5px var(--mono);color:var(--warn);border:1px dashed rgba(245,194,107,.45);border-radius:10px;padding:8px 10px}
+
+/* scaled tablet frame */
+.dev{position:relative;width:100%;aspect-ratio:1024/600;border-radius:14px;overflow:hidden;border:1px solid var(--line2);box-shadow:0 0 0 6px #111,0 0 0 7px #2a2a2a;background:var(--bg)}
+.scr{position:absolute;left:0;top:0;width:1024px;height:600px;transform-origin:0 0;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+.nav{display:grid;grid-template-columns:repeat(8,1fr);border-bottom:1px solid var(--line);height:56px;flex:none}
+.nav span{display:grid;place-items:center;font:20px var(--mono);color:var(--mute);border-right:1px solid var(--line);position:relative}
+.nav span.on{color:var(--hi);background:var(--c1)}
+.nav span.on::after{content:"";position:absolute;bottom:4px;width:32px;height:3px;border-radius:2px;background:var(--accent)}
+.body{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
+.sq{display:inline-block;width:12px;height:12px;border-radius:3px;flex:none}
+.s-work{background:var(--accent)}.s-wait{background:var(--warn)}.s-done{background:var(--ok)}.s-idle{background:#4a4a4a}
+@keyframes pulse{50%{opacity:.3}}
+.live{animation:pulse 1.4s infinite}
+@media (prefers-reduced-motion:reduce){.live{animation:none}}
+.meter{height:6px;border-radius:3px;background:var(--c3);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.pill{font:500 20px var(--sans);border-radius:999px;padding:13px 26px;border:1px solid var(--line2);color:var(--fg);background:transparent;white-space:nowrap;text-align:center}
+.pill.p{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.pill.w{background:var(--warn);color:var(--on-warn);border-color:var(--warn)}
+.pill.g{background:var(--ok);color:#0b2410;border-color:var(--ok)}
+.pill.sm{font-size:17px;padding:9px 18px}
+.pill.ghost{border-color:transparent;color:var(--soft)}
+
+.chips{display:flex;gap:10px;padding:16px 24px 0;flex:none}
+.chip{display:flex;align-items:center;gap:10px;font:19px var(--sans);padding:9px 18px;border-radius:999px;border:1px solid var(--line2);color:var(--soft)}
+.chip.on{background:var(--c2);color:var(--hi);border-color:#4a4a4a}
+.chip.wait{border-color:var(--warn);color:var(--warn)}
+.chip.wait.on{background:var(--warn-dim)}
+.chip .x{font:15px var(--mono);opacity:.8}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:28px;padding:20px 24px 0;flex:1;min-height:0}
+.grid.full{grid-template-columns:minmax(0,1fr)}
+.col{display:flex;flex-direction:column;min-height:0;min-width:0;padding-bottom:84px}
+.ask{font:18px/1.45 var(--mono);color:var(--mute);margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;flex:none}
+.ask b{color:var(--accent);font-weight:400}
+
+/* scrollable reply */
+.scroll{position:relative;flex:1;min-height:0}
+.reply{height:100%;overflow-y:auto;padding-right:18px;font:300 26px/1.44 var(--sans);color:var(--fg);letter-spacing:-.008em;scrollbar-width:none;overscroll-behavior:contain;
+  -webkit-mask-image:linear-gradient(transparent,#000 var(--ft,0px),#000 calc(100% - var(--fb,0px)),transparent);mask-image:linear-gradient(transparent,#000 var(--ft,0px),#000 calc(100% - var(--fb,0px)),transparent)}
+.reply::-webkit-scrollbar{display:none}
+.reply p{margin:0 0 .6em}
+.reply ul,.reply ol{margin:0 0 .6em;padding-left:1.1em}
+.reply li{margin-bottom:.2em}
+.reply code{font:400 .8em var(--mono);background:var(--c2);border-radius:6px;padding:1px 7px;color:var(--hi)}
+.reply b{font-weight:500;color:var(--hi)}
+.reply h4{font:500 21px var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:.4em 0 .3em}
+.thumb{position:absolute;right:2px;top:0;width:5px;border-radius:3px;background:var(--line2)}
+.thumb i{position:absolute;left:0;right:0;border-radius:3px;background:var(--soft)}
+.more{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font:16px var(--mono);color:var(--on-accent);background:var(--accent);border-radius:999px;padding:6px 14px;white-space:nowrap}
+
+/* side card */
+.side{background:var(--c1);border:1px solid var(--line);border-radius:22px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;min-height:0;margin-bottom:84px}
+.side.warn{background:linear-gradient(var(--warn-dim),transparent 70%),var(--c1);border-color:rgba(245,194,107,.55)}
+.side.ok{background:linear-gradient(var(--ok-dim),transparent 70%),var(--c1);border-color:rgba(159,216,168,.4)}
+.k{font:15px var(--mono);color:var(--mute);letter-spacing:.06em;text-transform:uppercase;display:flex;justify-content:space-between}
+.warn .k{color:var(--warn)}.ok .k{color:var(--ok)}
+.act{font:400 23px/1.3 var(--sans);color:var(--hi)}
+.act small{display:block;font:17px var(--mono);color:var(--accent);margin-top:6px}
+.steps{font:16.5px/1.75 var(--mono);color:var(--mute)}
+.steps div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.steps .bad{color:var(--bad)}
+.ctx{margin-top:auto;display:grid;gap:8px;font:16px var(--mono);color:var(--mute)}
+.ctx span{display:flex;justify-content:space-between}
+.cmd{font:18px/1.5 var(--mono);color:var(--hi);background:#000;border:1px solid var(--line2);border-radius:12px;padding:10px 14px;max-height:118px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.why{font:300 18px/1.4 var(--sans);color:var(--soft)}
+.timer{display:grid;gap:6px;font:15px var(--mono);color:var(--mute)}
+.timer .meter i{background:var(--warn)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btns .wide{grid-column:1/-1}
+
+/* question / choices */
+.qhead{display:flex;align-items:center;gap:12px;font:16px var(--mono);color:var(--warn);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;flex:none}
+.qhead .dots{display:flex;gap:6px;margin-left:auto}
+.qhead .dots i{width:26px;height:5px;border-radius:3px;background:var(--line2)}
+.qhead .dots i.on{background:var(--warn)}
+.qtext{font:400 29px/1.25 var(--sans);color:var(--hi);letter-spacing:-.02em;margin-bottom:14px;flex:none;text-wrap:balance}
+.opts{display:flex;flex-direction:column;gap:10px;overflow-y:auto;scrollbar-width:none;flex:1;min-height:0;padding-bottom:40px;-webkit-mask-image:linear-gradient(#000 calc(100% - 56px),transparent);mask-image:linear-gradient(#000 calc(100% - 56px),transparent)}
+.opts::-webkit-scrollbar{display:none}
+.o{display:grid;grid-template-columns:34px 1fr;gap:4px 14px;align-items:start;border:1px solid var(--line2);border-radius:18px;padding:14px 18px;background:var(--c1)}
+.o .box{grid-row:1/3;width:28px;height:28px;border-radius:50%;border:2px solid var(--line2);margin-top:2px;display:grid;place-items:center}
+.o.multi .box{border-radius:8px}
+.o.sel{border-color:var(--warn);background:var(--warn-dim)}
+.o.sel .box{border-color:var(--warn);background:var(--warn)}
+.o.sel .box::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--on-warn)}
+.o.multi.sel .box::after{width:12px;height:7px;border-radius:0;background:none;border:solid var(--on-warn);border-width:0 0 3px 3px;transform:rotate(-45deg) translate(1px,-1px)}
+.o .l{font:400 22px/1.25 var(--sans);color:var(--hi)}
+.o .l em{font:14px var(--mono);font-style:normal;color:var(--accent);background:var(--accent-dim);border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:3px}
+.o .d{font:300 17px/1.35 var(--sans);color:var(--soft)}
+.o.other{border-style:dashed;background:transparent}
+.o.other .l{color:var(--soft)}
+
+.bar{position:absolute;left:24px;right:24px;bottom:18px;display:flex;gap:12px;align-items:center}
+.bar .meta{margin-left:auto;font:16px var(--mono);color:var(--mute);white-space:nowrap}
+.strip{display:flex;align-items:center;gap:14px;font:17px var(--mono);color:var(--mute);padding:14px 24px 0;flex:none}
+.strip b{color:var(--hi);font:400 20px var(--sans)}
+.strip .meter{width:120px}
+.toast{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;background:var(--warn);color:var(--on-warn);border-radius:999px;padding:12px 14px 12px 22px;font:500 20px var(--sans);white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.6);z-index:3}
+.toast span{font:16px var(--mono);background:rgba(0,0,0,.14);border-radius:999px;padding:7px 14px}
+.empty{flex:1;display:grid;place-content:center;justify-items:center;gap:14px;text-align:center}
+.empty .big{font:300 40px/1.1 var(--sans);letter-spacing:-.03em;color:var(--fg)}
+.empty .sub{font:18px var(--mono);color:var(--mute);max-width:40ch}
+.empty .ticks{display:flex;gap:18px;font:16px var(--mono);color:var(--mute);margin-top:6px}
+.empty .ticks b{color:var(--ok);font-weight:400}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">deckd · claude pane · option A · 1024×600</div>
+  <h1>Conversation layout, state by state</h1>
+  <p>Option A shows your last prompt and Claude's last reply in large type, with one side card for whatever the session needs right now. Below are the ten states it has to handle. In each one, scroll the reply with a mouse wheel or trackpad: it is a real scroll area.</p>
+  <div class="rules">
+    <div><b>The side card is the state</b>Blue while working, amber when it needs you, green when done. The reply on the left stays put, so you keep reading while you decide.</div>
+    <div><b>Choices take over the left column</b>A question or a plan replaces the reply, because answering is the only thing to do. "Show reply" gets the reply back.</div>
+    <div><b>Text scrolls, never truncates</b>Long replies scroll by touch, with fades at the clipped edges, a thin position bar, and a "more below" pill until you reach the end.</div>
+    <div><b>Tap the reply to read it full width</b>The side card collapses into a one-line status strip. Tap again, or wait for the next event, to bring it back.</div>
+  </div>
+  <nav class="toc" id="toc"></nav>
+</header>
+<main id="states" style="display:grid;gap:52px;width:100%;min-width:0"></main>
+</div>
+
+<script>
+const NAV = `<div class="nav">${["HOME","CLAUDE","PULSE","DECK","MUSIC","BOARD","FOCUS","SYSTEM"].map(n=>`<span class="${n==="CLAUDE"?"on":""}">${n}</span>`).join("")}</div>`;
+const chip = (name, st, on, extra="") => `<div class="chip ${on?"on":""} ${st==="wait"?"wait":""}"><i class="sq s-${st} ${st==="work"?"live":""}"></i>${name}${extra?` <span class="x">${extra}</span>`:""}</div>`;
+const chips = (sel, over={}) => {
+  const base = {"lenovo-tab":"work","desk-demo":"done","deckd":"idle", ...over};
+  const label = {wait:"needs you"};
+  return `<div class="chips">${Object.entries(base).map(([n,s])=>chip(n,s,n===sel,s==="wait"?label.wait:"")).join("")}</div>`;
+};
+const ctx = (pct, label="context", val) => `<div class="ctx"><span><span>${label}</span><span>${val ?? pct+"%"}</span></span><div class="meter"><i style="width:${pct}%${pct>80?";background:var(--warn)":""}"></i></div></div>`;
+const reply = (html, id) => `<div class="scroll"><div class="reply" data-scroll="${id||""}">${html}</div><div class="thumb"><i></i></div><div class="more">↓ more below</div></div>`;
+const ASK = `<div class="ask"><b>you ›</b> the claude page is kind of useless, most of the screen is unreadable — mock out some designs</div>`;
+const LONG = `
+<p>Looked at the current pane: the session list eats a third of the width and the stats band repeats numbers you never read. I wrote four layouts at the tablet's real size.</p>
+<h4>What changed</h4>
+<ul><li>Sessions move to <b>chips</b> across the top.</li><li>Token totals move to <code>PULSE</code>.</li><li>The timeline becomes one plain sentence in the side card.</li></ul>
+<p>Separately, the context figure looks wrong. <code>claude.ts</code> should give about 36% for 359k on a 1M model, but the pane shows 100%. I haven't traced it yet.</p>
+<p>Pick a layout and I'll port it into <code>views.tsx</code>, keeping the existing nav and pill buttons.</p>`;
+
+const S = [
+{id:"working", dot:"work", title:"Working", tag:"default",
+ screen:()=>`${chips("lenovo-tab")}<div class="grid"><div class="col">${ASK}${reply(LONG)}</div>
+  <div class="side"><div class="k"><span>now</span><span>12s</span></div>
+   <div class="act">Writing the mockup page<small>Write · claude-pane.html</small></div>
+   <div class="steps"><div>Read  40-claude.png</div><div>Bash  list deckd ui</div><div>Read  claude.ts</div></div>
+   ${ctx(36,"context","359k / 1M")}</div></div>
+  <div class="bar"><span class="pill p">open in claude</span><span class="pill">terminal</span><span class="pill">copy reply</span><span class="meta">opus-5-5 · ~/lenovo-tab · 6m</span></div>`,
+ note:`<p>The resting state. Last prompt on top, last reply below it in 26px text, current action in the side card.</p>
+  <dl><dt>trigger</dt><dd><code>PreToolUse</code> / <code>PostToolUse</code>; reply from the transcript tail</dd>
+  <dt>steps</dt><dd>The last three tools, newest first. A failed tool shows in red (see Compacting).</dd></dl>`},
+
+{id:"reading", dot:"work", title:"Reading a long reply", tag:"tap reply",
+ screen:()=>`<div class="strip"><i class="sq s-work live"></i><b>lenovo-tab</b><span>writing the mockup page · 12s</span><span style="margin-left:auto">context</span><div class="meter"><i style="width:36%"></i></div></div>
+  <div class="grid full" style="padding-top:14px"><div class="col" style="padding-bottom:84px">${reply(LONG+LONG,"mid")}</div></div>
+  <div class="bar"><span class="pill">← back</span><span class="pill">copy reply</span><span class="meta">scrolled 40%</span></div>`,
+ note:`<p>Tapping the reply drops the chips and side card for a one-line status strip, so the reply gets the full 976px width. It opens already scrolled, so you can see the fades at both edges and the position bar.</p>
+  <dl><dt>exit</dt><dd>"Back", or automatically when this session starts needing you.</dd>
+  <dt>scroll</dt><dd>Native touch scroll on the WebView with overscroll contained, so it doesn't drag the pager.</dd></dl>`},
+
+{id:"permission", dot:"wait", title:"Permission request", tag:"needs you",
+ screen:()=>`${chips("desk-demo",{"desk-demo":"wait"})}<div class="grid"><div class="col"><div class="ask"><b>you ›</b> run the tests, then clean up before the release build</div>${reply(`<p>All <b>48 tests pass</b>. Clearing the stale build directory before bundling, so old chunks from the previous release don't ship.</p>`)}</div>
+  <div class="side warn"><div class="k"><span>wants to run bash</span><span>7s</span></div>
+   <div class="cmd">rm -rf build/ dist/.cache</div>
+   <div class="why">Clean the build dir</div>
+   <div class="timer"><span style="display:flex;justify-content:space-between"><span>falls back to laptop in</span><span>53s</span></span><div class="meter"><i style="width:88%"></i></div></div>
+   <div class="btns"><span class="pill">deny</span><span class="pill w">allow</span><span class="pill sm ghost wide">allow Bash for this session</span></div></div></div>
+  <div class="bar"><span class="pill p">open in claude</span><span class="pill">terminal</span><span class="meta">opus-5-5 · /tmp/desk-demo</span></div>`,
+ note:`<p>The side card turns amber and holds the full command, scrollable if it's long. The reply stays on the left so you know why it's asking.</p>
+  <dl><dt>trigger</dt><dd><code>PermissionRequest</code> held by <code>gate.ts</code>; the bar shows <code>expires</code></dd>
+  <dt>timeout</dt><dd>The prompt falls back to the laptop, as it does today.</dd></dl>
+  <div class="flag">"Allow for this session" is new. It needs the gate to return a permission-rule update, which isn't wired yet.</div>`},
+
+{id:"question", dot:"wait", title:"Question with choices", tag:"needs you",
+ screen:()=>`${chips("lenovo-tab",{"lenovo-tab":"wait"})}<div class="grid"><div class="col">
+   <div class="qhead"><i class="sq s-wait"></i>claude asks · layout<span class="dots"><i class="on"></i><i></i></span></div>
+   <div class="qtext">Which layout should I build into the desk app?</div>
+   <div class="opts">
+    <div class="o sel"><span class="box"></span><span class="l">Conversation<em>recommended</em></span><span class="d">Prompt and reply in large type, side card for state</span></div>
+    <div class="o"><span class="box"></span><span class="l">Inbox</span><span class="d">Sessions sorted by what they need from you</span></div>
+    <div class="o"><span class="box"></span><span class="l">Wall</span><span class="d">Three sessions side by side</span></div>
+    <div class="o other"><span class="box"></span><span class="l">Something else…</span><span class="d">Type it on the laptop</span></div>
+   </div></div>
+  <div class="side warn"><div class="k"><span>question 1 of 2</span><span>20s</span></div>
+   <div class="why">Pick one. The next question is about whether to keep the PULSE tab.</div>
+   <div class="steps"><div>Read  claude.ts</div><div>Write claude-pane.html</div></div>
+   <div class="btns" style="margin-top:auto"><span class="pill">show reply</span><span class="pill w">next →</span></div></div></div>
+  <div class="bar"><span class="pill">answer on laptop</span><span class="meta">opus-5-5 · ~/lenovo-tab</span></div>`,
+ note:`<p>When Claude asks a multiple-choice question, the question and big tappable options replace the reply. Each option keeps its description. "Something else" sends you to the laptop, since typing on the tablet isn't worth it.</p>
+  <dl><dt>trigger</dt><dd><code>AskUserQuestion</code> tool call; questions and options are in <code>tool_input.questions</code></dd>
+  <dt>several questions</dt><dd>One per screen, with progress dashes and "next →", then submit on the last one.</dd></dl>
+  <div class="flag">Showing the question is easy. Answering from the tablet means the gate allows the call with the answers filled in. That is plausible but untested, so the fallback is a read-only view plus "answer on laptop".</div>`},
+
+{id:"multi", dot:"wait", title:"Multi-select question", tag:"needs you",
+ screen:()=>`${chips("lenovo-tab",{"lenovo-tab":"wait"})}<div class="grid"><div class="col">
+   <div class="qhead"><i class="sq s-wait"></i>claude asks · scope<span class="dots"><i class="on"></i><i class="on"></i></span></div>
+   <div class="qtext">Which states should the first version handle?</div>
+   <div class="opts">
+    <div class="o multi sel"><span class="box"></span><span class="l">Permission prompts</span><span class="d">Allow / deny with the full command</span></div>
+    <div class="o multi sel"><span class="box"></span><span class="l">Questions</span><span class="d">Single and multi-select, answered on the tablet</span></div>
+    <div class="o multi"><span class="box"></span><span class="l">Plan approval</span><span class="d">Scrollable plan with approve / keep planning</span></div>
+    <div class="o multi"><span class="box"></span><span class="l">Reading mode</span><span class="d">Full-width reply on tap</span></div>
+   </div></div>
+  <div class="side warn"><div class="k"><span>question 2 of 2</span><span>34s</span></div>
+   <div class="why">Choose any. 2 selected.</div>
+   <div class="btns" style="margin-top:auto"><span class="pill">← back</span><span class="pill w">submit</span></div></div></div>
+  <div class="bar"><span class="pill">answer on laptop</span><span class="meta">opus-5-5 · ~/lenovo-tab</span></div>`,
+ note:`<p>The same screen with square checkboxes. The side card counts your selections, and the last question's button says "submit".</p>
+  <dl><dt>overflow</dt><dd>With more than four options the list scrolls, and the fade shows there are more.</dd></dl>`},
+
+{id:"plan", dot:"wait", title:"Plan ready for approval", tag:"needs you",
+ screen:()=>`${chips("deckd",{"deckd":"wait","desk-demo":"done"})}<div class="grid"><div class="col">
+   <div class="qhead"><i class="sq s-wait"></i>plan · port option A</div>
+   ${reply(`<h4>Goal</h4><p>Replace the Claude pane with the conversation layout. Keep the nav and the pill buttons.</p>
+   <h4>Steps</h4><ol><li>Add <code>prompt</code>, <code>reply</code> and a pending <code>question</code> to the session snapshot in <code>claude.ts</code>.</li><li>Fix <code>contextPct</code>, which reads 100% for 359k on a 1M model.</li><li>Rewrite <code>ClaudePane</code> in <code>views.tsx</code> with chips, a reply scroller and the side card.</li><li>Teach <code>gate.ts</code> to hold <code>AskUserQuestion</code> and return answers.</li><li>Retake <code>shots/41-claude-*.png</code> for every state.</li></ol>
+   <h4>Not in scope</h4><p>Typing replies from the tablet.</p>`,"plan")}</div>
+  <div class="side warn"><div class="k"><span>plan ready</span><span>1m</span></div>
+   <div class="act">5 steps · 3 files</div>
+   <div class="steps"><div>claude.ts</div><div>views.tsx</div><div>gate.ts</div></div>
+   <div class="btns" style="margin-top:auto"><span class="pill">keep planning</span><span class="pill w">approve</span><span class="pill sm ghost wide">approve, auto-accept edits</span></div></div></div>
+  <div class="bar"><span class="pill p">open in claude</span><span class="meta">opus-5-5 · ~/pocketdeck/deckd</span></div>`,
+ note:`<p>A plan is long, so it takes the scrollable left column. The side card lists the files it will touch and has the approve buttons.</p>
+  <dl><dt>trigger</dt><dd><code>PermissionRequest</code> for <code>ExitPlanMode</code>; the plan text is in <code>tool_input.plan</code></dd>
+  <dt>keep planning</dt><dd>Maps to deny, so Claude stays in plan mode.</dd></dl>`},
+
+{id:"done", dot:"done", title:"Finished", tag:"done",
+ screen:()=>`${chips("deckd",{"deckd":"done"})}<div class="grid"><div class="col"><div class="ask"><b>you ›</b> rewrite the usage provider to use the API headers</div>${reply(`<p>Usage now reads the <b>5-hour and weekly windows</b> straight from the rate-limit headers, so the bars match <code>/usage</code> exactly.</p><ul><li>Removed the log scraper and its 2-minute poll.</li><li>14 tests pass, 3 of them new.</li><li>Nothing committed yet.</li></ul>`)}</div>
+  <div class="side ok"><div class="k"><span>finished</span><span>4m ago</span></div>
+   <div class="act">Took 18 min</div>
+   <div class="steps"><div>edited usage.ts</div><div>edited usage.test.ts</div><div>deleted scrape.ts</div></div>
+   ${ctx(71,"context","142k / 200k")}</div></div>
+  <div class="bar"><span class="pill p">open in claude</span><span class="pill">copy reply</span><span class="pill">editor</span><span class="meta">sonnet-5-5 · ~/pocketdeck/deckd</span></div>`,
+ note:`<p>Green card. The reply is the main thing you came to read. The side card says how long the turn took and which files changed, taken from the Edit/Write calls of that turn.</p>
+  <dl><dt>trigger</dt><dd><code>Stop</code> hook</dd><dt>fades to idle</dt><dd>After 3 hours (<code>STALE_MS</code>) the chip goes grey.</dd></dl>`},
+
+{id:"compacting", dot:"work", title:"Compacting, or a tool failed", tag:"working",
+ screen:()=>`${chips("lenovo-tab")}<div class="grid"><div class="col">${ASK}${reply(LONG)}</div>
+  <div class="side"><div class="k"><span>compacting context</span><span>41s</span></div>
+   <div class="act">Summarising the conversation<small>frees room · back shortly</small></div>
+   <div class="steps"><div class="bad">✕ Bash  npm test (exit 1)</div><div>Edit  claude.ts</div><div>Read  gate.ts</div></div>
+   ${ctx(97,"context","194k / 200k")}</div></div>
+  <div class="bar"><span class="pill p">open in claude</span><span class="pill">terminal</span><span class="meta">opus-5-5 · ~/lenovo-tab · 52m</span></div>`,
+ note:`<p>Still blue, since nothing needs you. The meter turns amber above 80%, and failed tools show in red in the step list instead of a separate counter.</p>
+  <dl><dt>trigger</dt><dd><code>PreCompact</code> (already sets "compacting context"); failures from <code>PostToolUse</code></dd></dl>`},
+
+{id:"interrupt", dot:"wait", title:"Another session needs you", tag:"while reading",
+ screen:()=>`<div class="toast">desk-demo asks: allow Bash? <span>view →</span></div>${chips("lenovo-tab",{"desk-demo":"wait"})}<div class="grid"><div class="col">${ASK}${reply(LONG)}</div>
+  <div class="side"><div class="k"><span>now</span><span>12s</span></div>
+   <div class="act">Writing the mockup page<small>Write · claude-pane.html</small></div>
+   <div class="steps"><div>Read  40-claude.png</div><div>Bash  list deckd ui</div><div>Read  claude.ts</div></div>
+   ${ctx(36,"context","359k / 1M")}</div></div>
+  <div class="bar"><span class="pill p">open in claude</span><span class="pill">terminal</span><span class="pill">copy reply</span><span class="meta">opus-5-5 · ~/lenovo-tab · 6m</span></div>`,
+ note:`<p>The view doesn't jump to the other session while you're reading. Its chip turns amber and the existing toast drops in. Tap "view →" or the chip to switch.</p>
+  <dl><dt>trigger</dt><dd>The <code>onAlert</code> seq bump, as today</dd>
+  <dt>on other tabs</dt><dd>Same toast, and the tap switches to CLAUDE with that session selected.</dd></dl>`},
+
+{id:"empty", dot:"idle", title:"No sessions", tag:"empty",
+ screen:()=>`<div class="empty"><div class="big">No Claude sessions right now</div><div class="sub">Start one on the laptop and it shows up here within a second.</div>
+  <div class="ticks"><span><b>✓</b> hooks installed</span><span><b>✓</b> gate listening</span><span>last session 3h ago</span></div></div>`,
+ note:`<p>Shown when every session is past <code>STALE_MS</code>. The status line confirms the hooks are installed, so an empty screen doesn't look broken.</p>
+  <dl><dt>source</dt><dd><code>hooksInstalled()</code></dd></dl>`},
+];
+
+const toc = document.getElementById("toc"), main = document.getElementById("states");
+S.forEach((s,i)=>{
+  toc.insertAdjacentHTML("beforeend",`<a href="#${s.id}"><i class="sq s-${s.dot}"></i>${s.title}</a>`);
+  main.insertAdjacentHTML("beforeend",`<section class="opt" id="${s.id}"><div class="dev"><div class="scr">${NAV}<div class="body">${s.screen()}</div></div></div>
+   <div class="note"><span class="tag"><i class="sq s-${s.dot}"></i>${String(i+1).padStart(2,"0")} · ${s.tag}</span><h2>${s.title}</h2>${s.note}</div></section>`);
+});
+
+// scale each 1024×600 screen to its frame
+const fit=()=>document.querySelectorAll(".dev").forEach(d=>{d.firstElementChild.style.transform=`scale(${d.clientWidth/1024})`});
+new ResizeObserver(fit).observe(document.body); fit();
+
+// scroll affordances: edge fades, position bar, "more below" pill
+document.querySelectorAll(".reply").forEach(r=>{
+  const wrap=r.parentElement, thumb=wrap.querySelector(".thumb"), knob=thumb.querySelector("i"), more=wrap.querySelector(".more");
+  const upd=()=>{
+    const over=r.scrollHeight-r.clientHeight;
+    thumb.hidden = over<=2;
+    thumb.style.height = r.clientHeight+"px";
+    const kh=Math.max(30, r.clientHeight*r.clientHeight/r.scrollHeight);
+    knob.style.height=kh+"px"; knob.style.top=(over>0? (r.scrollTop/over)*(r.clientHeight-kh):0)+"px";
+    r.style.setProperty("--ft", r.scrollTop>4?"48px":"0px");
+    r.style.setProperty("--fb", r.scrollTop<over-4?"64px":"0px");
+    more.hidden = !(r.scrollTop<over-4);
+  };
+  r.addEventListener("scroll",upd,{passive:true});
+  requestAnimationFrame(()=>{ if(r.dataset.scroll==="mid") r.scrollTop=(r.scrollHeight-r.clientHeight)*.4; upd(); });
+  new ResizeObserver(upd).observe(r);
+});
+</script>

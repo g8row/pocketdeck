@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="deck-token" content="__DECK_TOKEN__">
+<title>Deck Studio</title>
+<link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+<div class="frame">
+  <nav class="nav">
+    <a href="#panes">Panes</a><a href="#deck">Deck</a><a href="#look">Look</a><a href="#claude">Claude</a><a href="#preview">Preview</a>
+  </nav>
+
+  <header class="sec mark hero">
+    <div>
+      <p class="eyebrow">deckd · tb-7304x</p>
+      <h1>deck <span class="accent">studio</span></h1>
+      <p class="sub">Arrange the tablet's panes, edit the deck, pick an accent. Saving writes
+        <code id="cfgpath">deck.config.json</code> and deckd hot-pushes it to the tablet.</p>
+    </div>
+    <div class="status">
+      <span class="dot" id="tabdot"></span><span id="tabstate" class="sub">checking…</span>
+      <button class="btn primary" id="save" disabled>save &amp; push</button>
+      <span class="sub" id="saved"></span>
+    </div>
+  </header>
+
+  <section class="sec mark" id="panes">
+    <p class="eyebrow">01 · panes</p>
+    <h2>what the nav strip shows</h2>
+    <p class="sub">Toggle panes, drag (or use ↑ ↓) to reorder. "show" jumps the tablet to that pane.</p>
+    <div class="strip" id="strip"></div>
+    <ol class="panes" id="panelist"></ol>
+  </section>
+
+  <section class="sec mark" id="deck">
+    <p class="eyebrow">02 · deck</p>
+    <h2>tiles</h2>
+    <p class="sub">Up to 12 tiles, packed in order into the tablet's 4×3 grid. Tiles in a row that share a group become one split pill; a column holding only a full-height pill becomes a narrow rail. Each runs on this computer when tapped. Click a tile to edit it.</p>
+    <div class="screen" id="tiles" role="group" aria-label="deck preview"></div>
+    <div class="deckbar"><button class="btn sm" id="addtile">+ add tile</button><span class="sub" id="dropped"></span></div>
+    <div class="editor card" id="editor" hidden>
+      <div class="row between"><h3 id="edtitle">tile</h3><button class="btn ghost" id="edclose">close</button></div>
+      <div class="form">
+        <label>label <input id="f-label" maxlength="24"></label>
+        <label>subtitle <input id="f-sub" maxlength="24" placeholder="optional"></label>
+        <label>color <span class="swatches" id="f-colors"></span></label>
+        <div class="form three">
+          <label>icon <select id="f-icon"></select></label>
+          <label>icon when on <select id="f-iconon"></select></label>
+          <label>size (cells)
+            <select id="f-size">
+              <option value="1x1">1 × 1</option><option value="2x1">2 wide</option><option value="3x1">3 wide</option>
+              <option value="1x2">2 tall</option><option value="1x3">3 tall (rail)</option><option value="2x2">2 × 2</option>
+            </select>
+          </label>
+          <label>group <input id="f-group" maxlength="24" placeholder="none — e.g. volume"></label>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="f-fill"> always filled with the colour</label>
+          <label class="check"><input type="checkbox" id="f-circle"> round (circle)</label>
+        </div>
+        <label>action
+          <select id="f-type">
+            <option value="builtin">built-in</option>
+            <option value="shell">shell command</option>
+            <option value="app">open app</option>
+            <option value="url">open URL</option>
+            <option value="applescript">AppleScript (macOS)</option>
+            <option value="shortcut">Shortcut (macOS)</option>
+          </select>
+        </label>
+        <label id="w-builtin">built-in <select id="f-builtin"></select></label>
+        <label id="w-value"><span id="f-valuelabel">value</span> <textarea id="f-value" rows="2" spellcheck="false"></textarea></label>
+      </div>
+      <div class="row">
+        <button class="btn" id="edtest">test now</button>
+        <button class="btn ghost" id="edleft">← move</button>
+        <button class="btn ghost" id="edright">move →</button>
+        <button class="btn danger" id="eddel">delete</button>
+        <span class="sub" id="edresult"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec mark" id="look">
+    <p class="eyebrow">03 · look</p>
+    <h2>accent</h2>
+    <div class="swatches big" id="accents"></div>
+    <label class="inline">custom <input id="accent" maxlength="7" size="8"></label>
+  </section>
+
+  <section class="sec mark" id="claude">
+    <p class="eyebrow">04 · claude code</p>
+    <h2>attention &amp; approvals</h2>
+    <div class="form two">
+      <label class="check"><input type="checkbox" id="c-flash"> flash the tablet when a session needs you</label>
+      <label class="check"><input type="checkbox" id="c-sound"> play a quiet sound on this computer</label>
+      <label class="check"><input type="checkbox" id="c-approvals"> allow / deny permission prompts from the tablet</label>
+      <label>tablet answer window (s) <input type="number" id="c-timeout" min="3" max="25"></label>
+      <label>"open in editor" app <input id="c-editor"></label>
+      <label>focus timer (min) <input type="number" id="f-minutes" min="1" max="180"></label>
+    </div>
+    <p class="sub">While approvals are on and the tablet is connected, a permission prompt waits up to the answer window for a tap on the tablet, then falls back to the normal prompt.</p>
+  </section>
+
+  <section class="sec mark" id="preview">
+    <p class="eyebrow">05 · preview</p>
+    <h2>the real screen</h2>
+    <div class="row"><button class="btn" id="shot">refresh</button><label class="check"><input type="checkbox" id="live"> live (every 3 s)</label></div>
+    <div class="tablet"><img id="screen" alt="tablet screenshot"><p class="sub" id="noshot">no screenshot yet</p></div>
+  </section>
+  <footer class="sec mark sub">deckd serves this page on 127.0.0.1 only · every API call needs this page's token</footer>
+</div>
+<script src="/ui/app.js"></script>
+</body>
+</html>

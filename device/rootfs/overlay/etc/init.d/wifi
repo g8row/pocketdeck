@@ -1,0 +1,30 @@
+#!/sbin/openrc-run
+# WiFi (MT6625L): radio on at boot, and join the networks saved with `wifi-up save` (/data/wifi), DHCP.
+# Firmware comes from tools/wifi-deploy.sh; without it the service only warns.
+description="WiFi (mt6625_0) via wifi-up"
+
+depend() {
+	need localmount
+	after networking
+	provide wlan
+}
+
+start() {
+	ebegin "Starting WiFi"
+	if [ ! -f /etc/firmware/WIFI_RAM_CODE ]; then
+		ewarn "no WiFi firmware in /etc/firmware (run tools/wifi-deploy.sh from the host)"
+		eend 0
+		return 0
+	fi
+	# in the background: joining can take up to a minute and must not hold up the rest of the boot (PocketJS)
+	arg=; [ -f /data/wifi/wpa_supplicant.conf ] && arg=join
+	setsid /usr/local/sbin/wifi-up $arg < /dev/null > /tmp/wifi-service.log 2>&1 &
+	einfo "log: /tmp/wifi-service.log, /tmp/wifi/"
+	eend 0
+}
+
+stop() {
+	ebegin "Stopping WiFi"
+	/usr/local/sbin/wifi-up off > /dev/null 2>&1
+	eend 0
+}

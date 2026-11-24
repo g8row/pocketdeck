@@ -1,0 +1,29 @@
+#!/bin/sh
+# Safety net, same rules as stage 1:
+#  - 60 s after reaching userspace the boot counts as good: bootcount (stage 1 gives up on the rootfs after 2 bad
+#    ones) and the boot record (`tbstate healthy`: U-Boot boots Android after 3 unhealthy Linux boots).
+#  - Optional timed return to Android: tb.autoreboot=<s> on the cmdline or a number in /etc/tb-autoreboot.
+#    Default 0 (off): Linux is the default OS since U-Boot sits in `boot` (docs/architecture/boot-chain.md).
+#    /tmp/stay or /run/stay pauses it. The reboot sets LK's one-shot RTC recovery flag (Android in `recovery`);
+#    a plain reboot would come back to Linux. sysrq s,u,b because `reboot -f` can hang on this kernel.
+T=0
+for a in $(cat /proc/cmdline); do case "$a" in tb.autoreboot=*) T=${a#tb.autoreboot=} ;; esac; done
+[ -f /etc/tb-autoreboot ] && T=$(cat /etc/tb-autoreboot)
+(
+	sleep 60
+	[ -d /mnt/cache/linux ] && echo 0 > /mnt/cache/linux/bootcount; sync
+	# boot record: healthy resets U-Boot's attempt counter (stage 1 copies the tool in; boot-chain.md, "The tbstate boot record")
+	/usr/local/sbin/tbstate healthy > /dev/null 2>&1 || logger -t tb7304 "tbstate healthy failed"
+	t=60
+	while [ "$T" -gt 0 ]; do
+		sleep 5; t=$((t + 5))
+		{ [ -e /tmp/stay ] || [ -e /run/stay ]; } && continue
+		if [ $t -ge "$T" ]; then
+			logger -t tb7304 "autoreboot after ${t}s, to Android"
+			echo recovery > /sys/devices/platform/rtc-boot-mode/next_boot
+			echo 1 > /proc/sys/kernel/sysrq
+			echo s > /proc/sysrq-trigger; sleep 1; echo u > /proc/sysrq-trigger; sleep 1
+			echo b > /proc/sysrq-trigger
+		fi
+	done
+) </dev/null >/dev/null 2>&1 &
