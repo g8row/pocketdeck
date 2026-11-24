@@ -24,6 +24,8 @@ export interface TileDef {
   /** Always draw filled with the tile colour (else only while "on"). */
   fill?: boolean;
   shape?: "circle";
+  /** "term": square frame + mono text (terminal style) instead of the rounded tile. */
+  look?: "term";
   sub?: string;
 }
 
@@ -36,13 +38,13 @@ export const tiles: TileDef[] = [
   { id: "vol.up", label: "Vol +", color: "zinc", icon: "vol-up", group: "volume", h: 3 },
   { id: "vol.down", label: "Vol −", color: "zinc", icon: "vol-down", group: "volume" },
   { id: "mic.toggle", label: "Mic", color: "rose", icon: "mic", iconOn: "mic-off", h: 2, shape: "circle" },
-  { id: "open.claude", label: "Claude", color: "amber", icon: "spark", w: 2 },
-  { id: "open.terminal", label: "Terminal", color: "blue", icon: "terminal" },
-  { id: "screenshot", label: "Screenshot", color: "emerald", icon: "screenshot" },
-  { id: "focus.toggle", label: "Focus", color: "blue", icon: "timer", fill: true },
+  { id: "dnd.toggle", label: "DND", color: "violet", icon: "bell-off", w: 2, look: "term" },
+  { id: "caffeine.toggle", label: "Caffeine", color: "latte", icon: "cup" },
+  { id: "open.terminal", label: "Terminal", color: "blue", icon: "terminal", look: "term" },
+  { id: "screenshot", label: "Screenshot", color: "emerald", icon: "crop" },
+  { id: "nightlight.toggle", label: "Night", color: "amber", icon: "moon", look: "term" },
   { id: "lock", label: "Lock", color: "violet", icon: "lock", group: "away", fill: true },
   { id: "display.sleep", label: "Sleep display", color: "zinc", icon: "display", group: "away" },
-  { id: "caffeine.toggle", label: "Caffeine", color: "latte", icon: "cup" },
 ];
 
 export const actions: Record<string, (args?: unknown) => Promise<unknown>> = {
@@ -66,10 +68,14 @@ export interface LiveTile {
   sub?: string;
   on?: boolean;
   level?: number;
+  /** the level's output is muted (the readout shows a mute icon; tapping it sends `vol.mute`) */
+  muted?: boolean;
 }
 export const builtinState: Record<string, (m: HostState) => LiveTile> = {
   "mic.toggle": (m) => (m.micMuted ? { sub: "MUTED", on: true } : { sub: "live", on: false }),
-  "vol.up": (m) => ({ level: m.muted ? 0 : m.out }),
-  "vol.down": (m) => ({ level: m.muted ? 0 : m.out }),
+  "vol.up": (m) => ({ level: m.out, muted: m.muted }),
+  "vol.down": (m) => ({ level: m.out, muted: m.muted }),
   "caffeine.toggle": (m) => (m.caffeine ? { sub: "awake", on: true } : { sub: "off", on: false }),
+  "dnd.toggle": (m) => (m.dnd ? { sub: "quiet", on: true } : { sub: "off", on: false }),
+  "nightlight.toggle": (m) => (m.nightLight ? { sub: "warm", on: true } : { sub: "off", on: false }),
 };

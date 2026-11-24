@@ -272,6 +272,7 @@ function openEditor() {
   $("f-group").value = t.group || "";
   $("f-fill").checked = !!t.fill;
   $("f-circle").checked = t.shape === "circle";
+  $("f-term").checked = t.look === "term";
   // AppleScript / Shortcuts only run on macOS: offer them there (or when a tile already uses one)
   for (const o of $("f-type").options) o.hidden = meta.platform !== "darwin" && (o.value === "applescript" || o.value === "shortcut") && o.value !== t.action.type;
   $("f-builtin").innerHTML = Object.entries(meta.builtins).map(([k, v]) => `<option value="${k}">${k} — ${v}</option>`).join("");
@@ -305,6 +306,7 @@ $("f-iconon").onchange = (e) => setOpt("iconOn", e.target.value);
 $("f-group").oninput = (e) => setOpt("group", e.target.value.trim());
 $("f-fill").onchange = (e) => setOpt("fill", e.target.checked);
 $("f-circle").onchange = (e) => setOpt("shape", e.target.checked ? "circle" : "");
+$("f-term").onchange = (e) => setOpt("look", e.target.checked ? "term" : "");
 $("f-size").onchange = (e) => {
   const [w, h] = e.target.value.split("x").map(Number);
   const t = cfg.tiles[sel];

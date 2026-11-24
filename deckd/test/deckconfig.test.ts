@@ -53,11 +53,11 @@ describe("desk config", () => {
     expect([a?.icon, a?.iconOn, a?.w, a?.h, a?.group, a?.fill, a?.shape]).toEqual(["cup", undefined, 2, 3, "g", true, "circle"]);
     expect(b).toEqual({ id: "b", label: "B", color: "zinc", action: { type: "shell", cmd: "x" } });
   });
-  test("default deck is the rail: volume pill first, caffeine last", () => {
+  test("default deck is the rail: volume pill first, the lock / sleep pair last", () => {
     const t = defaultConfig().tiles;
     expect(t.slice(0, 2).map((x) => [x.id, x.group])).toEqual([["vol.up", "volume"], ["vol.down", "volume"]]);
     expect(t[0]?.h).toBe(3);
-    expect(t.at(-1)?.id).toBe("caffeine.toggle");
+    expect(t.slice(-2).map((x) => [x.id, x.group])).toEqual([["lock", "away"], ["display.sleep", "away"]]);
     expect(t.every((x) => x.icon)).toBe(true);
     expect(normalizeConfig(defaultConfig())).toEqual(defaultConfig()); // defaults survive normalize
   });

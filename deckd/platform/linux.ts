@@ -57,14 +57,44 @@ type Dev = "sink" | "source";
 const WP: Record<Dev, string> = { sink: "@DEFAULT_AUDIO_SINK@", source: "@DEFAULT_AUDIO_SOURCE@" };
 const PA: Record<Dev, string> = { sink: "@DEFAULT_SINK@", source: "@DEFAULT_SOURCE@" };
 
-async function getVol(d: Dev): Promise<[number, boolean] | null> {
+/** The microphone to use, from `pactl get-default-source` and `pactl list short sources`: the default source, unless
+ *  it is a sink's monitor (no microphone chosen), then the first real input; null = no microphone. */
+export function pickSource(def: string, list: string): string | null {
+  const real = (n: string) => !!n && !n.endsWith(".monitor");
+  const d = def.trim();
+  if (real(d)) return d;
+  const names = list.split("\n").map((l) => l.split("\t")[1]?.trim() ?? "");
+  return names.find(real) ?? null;
+}
+
+/** Where a device's commands go. With no microphone chosen, PipeWire resolves @DEFAULT_AUDIO_SOURCE@ to the
+ *  default SINK (the monitor's owner), so the default-source alias would mute the speakers: sources are resolved
+ *  to a real input by name (pactl), or verified to be an Audio/Source (wpctl only), or there is none. */
+type Target = { wp?: string; pa?: string } | null;
+async function target(d: Dev): Promise<Target> {
+  if (d === "sink") return { wp: has("wpctl") ? WP.sink : undefined, pa: has("pactl") ? PA.sink : undefined };
+  if (has("pactl")) {
+    const [def, list] = await Promise.all([$`pactl get-default-source`.quiet().nothrow(), $`pactl list short sources`.quiet().nothrow()]);
+    const name = pickSource(def.stdout.toString(), list.stdout.toString());
+    return name ? { pa: name } : null;
+  }
   if (has("wpctl")) {
-    const r = await $`wpctl get-volume ${WP[d]}`.quiet().nothrow();
+    const r = await $`wpctl inspect ${WP.source}`.quiet().nothrow();
+    return /media\.class = "Audio\/Source"/.test(r.stdout.toString()) ? { wp: WP.source } : null;
+  }
+  return {}; // amixer only
+}
+
+async function getVol(d: Dev): Promise<[number, boolean] | null> {
+  const t = await target(d);
+  if (!t) return null;
+  if (t.wp) {
+    const r = await $`wpctl get-volume ${t.wp}`.quiet().nothrow();
     const v = r.exitCode === 0 ? parseWpctl(r.stdout.toString()) : null;
     if (v) return v;
   }
-  if (has("pactl")) {
-    const [v, m] = await Promise.all([$`pactl get-${d}-volume ${PA[d]}`.quiet().nothrow(), $`pactl get-${d}-mute ${PA[d]}`.quiet().nothrow()]);
+  if (t.pa) {
+    const [v, m] = await Promise.all([$`pactl get-${d}-volume ${t.pa}`.quiet().nothrow(), $`pactl get-${d}-mute ${t.pa}`.quiet().nothrow()]);
     return parsePactl(v.stdout.toString(), m.stdout.toString());
   }
   return null;
@@ -72,19 +102,23 @@ async function getVol(d: Dev): Promise<[number, boolean] | null> {
 
 async function stepVol(d: Dev, delta: number): Promise<void> {
   const step = `${Math.abs(delta)}%${delta > 0 ? "+" : "-"}`;
-  if (has("wpctl") && (await $`wpctl set-volume -l 1.0 ${WP[d]} ${step}`.quiet().nothrow()).exitCode === 0) return;
-  if (has("pactl")) {
+  const t = await target(d);
+  if (!t) return;
+  if (t.wp && (await $`wpctl set-volume -l 1.0 ${t.wp} ${step}`.quiet().nothrow()).exitCode === 0) return;
+  if (t.pa) {
     const cur = (await getVol(d))?.[0] ?? 0;
     const next = Math.max(0, Math.min(100, cur + delta));
-    await $`pactl set-${d}-volume ${PA[d]} ${next}%`.quiet().nothrow();
+    await $`pactl set-${d}-volume ${t.pa} ${next}%`.quiet().nothrow();
     return;
   }
   await first(["amixer", "-q", "sset", d === "sink" ? "Master" : "Capture", step]);
 }
 
 async function toggleMute(d: Dev): Promise<void> {
-  if (has("wpctl") && (await $`wpctl set-mute ${WP[d]} toggle`.quiet().nothrow()).exitCode === 0) return;
-  if (has("pactl") && (await $`pactl set-${d}-mute ${PA[d]} toggle`.quiet().nothrow()).exitCode === 0) return;
+  const t = await target(d);
+  if (!t) return;
+  if (t.wp && (await $`wpctl set-mute ${t.wp} toggle`.quiet().nothrow()).exitCode === 0) return;
+  if (t.pa && (await $`pactl set-${d}-mute ${t.pa} toggle`.quiet().nothrow()).exitCode === 0) return;
   await first(["amixer", "-q", "sset", d === "sink" ? "Master" : "Capture", "toggle"]);
 }
 
@@ -97,7 +131,16 @@ let caffeineBus: Bus | null = null;
 let caffeineProc: ReturnType<typeof Bun.spawn> | null = null;
 const caffeineOn = () => !!caffeineBus?.connected || (!!caffeineProc && caffeineProc.exitCode === null);
 
-async function caffeineToggle(): Promise<void> {
+// One toggle at a time: turning on awaits the bus, and a second tap in that window would see "off" too, open a
+// second connection and lose the first (an inhibit nobody can release short of restarting deckd).
+let caffeineBusy: Promise<void> | null = null;
+function caffeineToggle(): Promise<void> {
+  if (!caffeineBusy) caffeineBusy = caffeineFlip().finally(() => (caffeineBusy = null));
+  return caffeineBusy;
+}
+
+/** KDE's power widget lists the ScreenSaver inhibit only after it has been held ~5 s (PowerDevil's delay). */
+async function caffeineFlip(): Promise<void> {
   if (caffeineOn()) {
     caffeineBus?.close();
     caffeineBus = null;
@@ -122,6 +165,108 @@ async function caffeineToggle(): Promise<void> {
       stderr: "ignore",
     });
   }
+}
+
+// ---- Do Not Disturb: a notification inhibit held by deckd (Plasma, GNOME 46+, others with the 1.3 spec) --------
+
+const NOTIF = ["org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications"] as const;
+let dndBus: Bus | null = null;
+let dndBusy: Promise<void> | null = null;
+
+async function busProp(dest: string, path: string, iface: string, prop: string): Promise<boolean | null> {
+  if (!has("busctl")) return null;
+  const r = await $`busctl --user get-property ${dest} ${path} ${iface} ${prop}`.quiet().nothrow();
+  const m = /^b (true|false)/.exec(r.stdout.toString().trim());
+  return m ? m[1] === "true" : null;
+}
+
+/** On = deckd holds an inhibit or someone else (the widget) has notifications held back. */
+async function dndState(): Promise<boolean | null> {
+  if (dndBus?.connected) return true;
+  return busProp(...NOTIF, "Inhibited");
+}
+
+/** Plasma's own switch (the notifications widget) stores DND as an end time in plasmanotifyrc. */
+async function plasmaDndUntil(): Promise<string> {
+  if (!isKDE || !has("kreadconfig6")) return "";
+  return (await $`kreadconfig6 --file plasmanotifyrc --group DoNotDisturb --key Until`.quiet().nothrow()).stdout.toString().trim();
+}
+
+function dndToggle(): Promise<void> {
+  dndBusy ??= (async () => {
+    if (await dndState()) {
+      // off, whoever turned it on: our inhibit, and Plasma's widget switch (cleared the way the widget does)
+      dndBus?.close(); // the server drops the inhibit with our connection
+      dndBus = null;
+      if (await plasmaDndUntil()) await $`kwriteconfig6 --notify --file plasmanotifyrc --group DoNotDisturb --key Until --delete`.quiet().nothrow();
+      return;
+    }
+    const bus = await Bus.session();
+    try {
+      await bus.call(...NOTIF, "Inhibit", [{ s: "deckd" }, { s: "PocketDeck: do not disturb" }, { asv: {} }]);
+      dndBus = bus;
+    } catch (e) {
+      bus.close();
+      throw e;
+    }
+  })().finally(() => (dndBusy = null));
+  return dndBusy;
+}
+
+// ---- change watchers: volume / mute (pactl subscribe), DND and Night Light (PropertiesChanged) --------------
+
+const watchers: ReturnType<typeof Bun.spawn>[] = [];
+process.on("exit", () => watchers.forEach((p) => p.kill()));
+
+/** Run `argv` for as long as deckd lives (restarted 5 s after it exits); every output line passing `hit`
+ *  calls `changed`, coalesced over 150 ms (one volume-key press is a burst of events). */
+function follow(argv: string[], hit: (line: string) => boolean, changed: () => void) {
+  if (!has(argv[0]!)) return;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const start = () => {
+    const p = Bun.spawn(argv, { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+    watchers.push(p);
+    (async () => {
+      let rest = "";
+      for await (const chunk of p.stdout as ReadableStream<Uint8Array>) {
+        const lines = (rest + new TextDecoder().decode(chunk)).split("\n");
+        rest = lines.pop() ?? "";
+        if (lines.some(hit) && !timer)
+          timer = setTimeout(() => {
+            timer = null;
+            changed();
+          }, 150);
+      }
+    })().catch(() => {});
+    p.exited.then(() => {
+      watchers.splice(watchers.indexOf(p), 1);
+      setTimeout(start, 5000);
+    });
+  };
+  start();
+}
+
+function watch(changed: () => void): void {
+  follow(["pactl", "subscribe"], (l) => /'(change|new|remove)' on (sink|source|server)/.test(l), changed);
+  const props = (path: string) => `type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',path='${path}'`;
+  follow(["dbus-monitor", "--session", props("/org/freedesktop/Notifications"), props("/org/kde/KWin/NightLight")], (l) => l.startsWith("signal"), changed);
+}
+
+// ---- Night Light (KWin): KWin's own inhibit only pauses a configured Night Light, so this flips the setting ----
+
+const NIGHT = ["org.kde.KWin.NightLight", "/org/kde/KWin/NightLight", "org.kde.KWin.NightLight"] as const;
+const nightState = () => (isKDE ? busProp(...NIGHT, "enabled") : Promise.resolve(null));
+
+async function nightToggle(): Promise<void> {
+  if (!isKDE || !has("kwriteconfig6")) throw new Error("Night Light needs KDE Plasma 6");
+  const on = !(await nightState());
+  // never configured: "always on" (the default, Automatic, would do nothing until sunset)
+  const mode = (await $`kreadconfig6 --file kwinrc --group NightColor --key Mode`.quiet().nothrow()).stdout.toString().trim();
+  if (on && !mode) await $`kwriteconfig6 --file kwinrc --group NightColor --key Mode Constant`.quiet();
+  // --notify is what KWin listens to (its D-Bus reconfigure doesn't re-read Night Light), and KConfig only notifies
+  // on a real change: write the opposite first in case the file and KWin disagree
+  await $`kwriteconfig6 --file kwinrc --group NightColor --key Active ${String(!on)}`.quiet();
+  await $`kwriteconfig6 --notify --file kwinrc --group NightColor --key Active ${String(on)}`.quiet();
 }
 
 const canCaffeine = () => has("systemd-inhibit") || !!process.env.DBUS_SESSION_BUS_ADDRESS || existsSync(`/run/user/${process.getuid?.()}/bus`);
@@ -164,7 +309,16 @@ function picturesDir(): string {
   return process.env.HOME ?? tmpdir();
 }
 
+/** Pick a region on screen, copy it to the clipboard. Falls back to a full-screen file in ~/Pictures where no
+ *  region tool exists. Resolves when the selection is made (or cancelled). */
 async function screenshot(): Promise<void> {
+  const region: string[][] = [
+    ...(isKDE ? [["spectacle", "-r", "-b", "-n", "-c"]] : []),
+    ...(isGNOME ? [["gnome-screenshot", "-a", "-c"]] : []),
+  ];
+  if (wayland && has("grim") && has("slurp") && has("wl-copy")) region.push(["sh", "-c", 'grim -g "$(slurp)" - | wl-copy -t image/png']);
+  if (!wayland && has("maim") && has("xclip")) region.push(["sh", "-c", "maim -s | xclip -selection clipboard -t image/png"]);
+  if (await first(...region)) return;
   const f = join(picturesDir(), `desk-${new Date().toISOString().replace(/[:.]/g, "-")}.png`);
   await first(
     ...(isKDE ? [["spectacle", "-b", "-n", "-f", "-o", f]] : []),
@@ -413,6 +567,8 @@ async function readState(): Promise<HostState | null> {
     input: inp?.[1] ? 0 : (inp?.[0] ?? 0),
     micMuted: inp ? inp[1] || inp[0] === 0 : true,
     caffeine: canCaffeine() ? caffeineOn() : null,
+    dnd: await dndState().catch(() => null),
+    nightLight: await nightState().catch(() => null),
   };
 }
 
@@ -441,10 +597,13 @@ export const linux: Host = {
 
   readState,
 
+  watch,
+
   actions: {
     "mic.toggle": () => toggleMute("source"),
     "vol.down": () => stepVol("sink", -6),
     "vol.up": () => stepVol("sink", 6),
+    "vol.mute": () => toggleMute("sink"),
     "open.terminal": async () => {
       openTerminal(process.env.HOME ?? "/");
     },
@@ -458,6 +617,8 @@ export const linux: Host = {
     lock,
     "display.sleep": displayOff,
     "caffeine.toggle": caffeineToggle,
+    "dnd.toggle": dndToggle,
+    "nightlight.toggle": nightToggle,
     "music.toggle": () => mpris.control("PlayPause"),
     "music.next": () => mpris.control("Next"),
     "music.prev": () => mpris.control("Previous"),
@@ -467,11 +628,14 @@ export const linux: Host = {
     "mic.toggle": "mute / unmute the default microphone",
     "vol.down": "output volume −6",
     "vol.up": "output volume +6",
+    "vol.mute": "mute / unmute the output",
     "open.terminal": "open a terminal",
     "open.claude": "Claude desktop app, else a terminal running claude",
-    screenshot: "screenshot to Desktop / Pictures",
     lock: "lock the screen",
     "display.sleep": "turn the monitors off",
+    "dnd.toggle": "Do Not Disturb on / off (holds notifications back)",
+    "nightlight.toggle": "Night Light on / off (KDE)",
+    "screenshot": "pick a region, copy it to the clipboard",
     "caffeine.toggle": "caffeine on / off (blocks idle + sleep while deckd runs)",
     "music.toggle": "media play / pause (MPRIS)",
     "music.next": "media next track (MPRIS)",

@@ -5,12 +5,22 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inflateSync } from "node:zlib";
-import { displaysAsleep, editorCommand, lockedHint, memFromMeminfo, memInfoFromMeminfo, parsePactl, parseWpctl, pickWindow, terminalArgv } from "../platform/linux.ts";
+import { displaysAsleep, editorCommand, lockedHint, memFromMeminfo, memInfoFromMeminfo, parsePactl, parseWpctl, pickSource, pickWindow, terminalArgv } from "../platform/linux.ts";
 import { methodCall, parseMessages } from "../platform/dbus.ts";
 import { fromGetAll, loopToRepeat, nextLoop, shortPlayer, toMusic, volumePct } from "../providers/mpris.ts";
 import { parseTablet } from "../providers/tablet.ts";
 import { findDesktopEntry } from "../runner.ts";
 import { encodePng, fbToPng } from "../transport.ts";
+
+test("dbus: an empty a{sv} argument", () => {
+  const m = methodCall(1, "org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Inhibit", [{ s: "a" }, { s: "b" }, { asv: {} }]);
+  const txt = new TextDecoder().decode(m);
+  expect(txt).toContain("ssa{sv}");
+  // body: "a" at 0 (6 bytes), "b" at 8 (6 bytes), the array length 0 at 16, then padding to the dict entries'
+  // 8-byte alignment even though there are none: 24 bytes
+  expect(new DataView(m.buffer).getUint32(4, true)).toBe(24); // body length
+  expect(Array.from(m.slice(m.length - 8))).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+});
 
 describe("audio parsing", () => {
   test("wpctl", () => {
@@ -21,6 +31,12 @@ describe("audio parsing", () => {
   test("pactl", () => {
     expect(parsePactl("Volume: front-left: 26214 /  40% / -23.88 dB,   front-right: 26214 /  40% / -23.88 dB", "Mute: yes")).toEqual([40, true]);
     expect(parsePactl("Volume: mono: 65536 / 100% / 0.00 dB", "Mute: no")).toEqual([100, false]);
+  });
+  test("microphone: never a sink monitor", () => {
+    const list = "54\talsa_output.pci.analog-stereo.monitor\tPipeWire\ts32le 2ch 48000Hz\tSUSPENDED\n55\talsa_input.pci.analog-stereo\tPipeWire\ts32le 2ch 48000Hz\tSUSPENDED\n";
+    expect(pickSource("alsa_input.usb-mic.mono\n", list)).toBe("alsa_input.usb-mic.mono");
+    expect(pickSource("alsa_output.pci.analog-stereo.monitor\n", list)).toBe("alsa_input.pci.analog-stereo");
+    expect(pickSource("alsa_output.pci.analog-stereo.monitor\n", "54\talsa_output.pci.analog-stereo.monitor\tPipeWire\n")).toBeNull();
   });
 });
 

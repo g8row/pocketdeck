@@ -116,6 +116,16 @@ Sources are in git history (tag `android-era-final`, see [history](../history/RE
 - `mlsh.py` (telnet) appends `; echo marker`: start background jobs as `(setsid sh -c '…' </dev/null >/dev/null 2>&1 &)`.
 - Stage 1 auto-reboots after 300 s unless `/tmp/stay` exists (`mlsh.py wait`); stage 2's auto-reboot is off.
 - Wait for `healthy` between test reboots (3 attempts → rescue → Android).
+- Restart deckd after a merge or branch switch that replaces `deckd/`: a process whose working directory was
+  deleted fails every spawn with ENOENT (every deck action "failed: No such file or directory").
+- With no microphone chosen, PipeWire resolves `@DEFAULT_AUDIO_SOURCE@` to the default **sink**: muting the
+  "default source" muted the speakers. deckd resolves a real input by name (`pickSource`).
+- KDE: PowerDevil lists a ScreenSaver/idle inhibit only after it has been held a few seconds (the battery widget
+  shows caffeine late, not never). KWin applies Night Light changes only through `kwriteconfig6 --notify`
+  (not D-Bus `reconfigure`), and KConfig notifies only when the value changes. Plasma's widget DND is
+  `plasmanotifyrc [DoNotDisturb] Until`; the `Notifications.Inhibited` property covers both it and app inhibits.
+- The touch learner scores every short, still tap in its 40 px cell: ~10 taps on one spot within a minute mask
+  it (injected test taps that never move hit this first; so could fast repeated taps on one button).
 
 ## UI (PocketJS)
 

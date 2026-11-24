@@ -531,7 +531,8 @@ async function main() {
   setInterval(() => sysState().then((s) => setState("sys", s)).catch(() => {}), 2000);
   setInterval(() => hostState().then((h) => setState("host", h)).catch(() => {}), 2000);
   setInterval(() => refreshMusic().catch(() => {}), 1000);
-  setInterval(() => refreshDeck().catch(() => {}), 5000);
+  setInterval(() => refreshDeck().catch(() => {}), 5000); // backstop: host.watch() reports most changes at once
+  host.watch?.(() => refreshDeck().catch(() => {}));
   setInterval(() => pollTranscripts().then(pushClaude).catch(() => {}), 3000);
   setInterval(() => pushClaude(), 1000); // "ago" labels + the gate countdown
   setInterval(() => scanUsage().then(() => setState("usage", usageState())).catch(() => {}), 30_000);
@@ -543,6 +544,8 @@ async function main() {
   }, 1000);
   setInterval(() => keepAdbReverse(PORT, log).catch(() => {}), 3000);
   setInterval(() => keepSshTunnel(PORT, log).catch(() => {}), 3000);
+  // how the tablet reaches us (deckd listens on loopback only: through the ssh tunnel or adb reverse), for BOARD
+  setInterval(() => setState("link", { via: tabletVia() }), 2000);
   setInterval(async () => {
     const t = await readTablet().catch(() => null);
     if (t) setState("tablet", t);
@@ -557,6 +560,7 @@ async function main() {
     .then(() => setState("usage", usageState()))
     .catch(() => {});
   await Promise.all([refreshFast(), keepAdbReverse(PORT, log), keepSshTunnel(PORT, log)]);
+  setState("link", { via: tabletVia() });
   // a tablet found on the first pass is worth its vitals right away
   if (tabletVia()) readTablet().then((t) => t && setState("tablet", t)).catch(() => {});
 }

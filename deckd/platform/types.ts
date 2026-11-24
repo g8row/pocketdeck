@@ -23,6 +23,10 @@ export interface HostState {
   micMuted: boolean;
   /** null = not available on this machine. */
   caffeine: boolean | null;
+  /** Notifications held back (Do Not Disturb); undefined/null = not available. */
+  dnd?: boolean | null;
+  /** Night Light on. */
+  nightLight?: boolean | null;
 }
 
 export type Builtin = (args?: unknown) => Promise<unknown>;
@@ -37,6 +41,9 @@ export interface Host {
   /** The host's screen: unlocked and on, locked, or off (DPMS). Fails soft to "active". */
   screen(): Promise<ScreenState>;
   readState(): Promise<HostState | null>;
+  /** Call `changed` whenever something behind readState() may have changed outside deckd (volume keys, the
+   *  desktop's own DND / Night Light switches), so tiles follow at once instead of at the next poll. */
+  watch?(changed: () => void): void;
   /** Builtin tile actions (vol.up, mic.toggle, lock…). */
   actions: Record<string, Builtin>;
   /** Descriptions of the builtins above, for Deck Studio's picker. */

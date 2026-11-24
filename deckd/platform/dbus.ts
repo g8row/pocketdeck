@@ -6,7 +6,8 @@
 
 import type { Socket } from "bun";
 
-type Arg = { s: string } | { u: number };
+/** `asv: {}` = an empty a{sv} (hints/options maps nobody here needs to fill). */
+type Arg = { s: string } | { u: number } | { asv: Record<string, never> };
 
 class Writer {
   buf: number[] = [];
@@ -32,14 +33,21 @@ class Writer {
 }
 
 function args(w: Writer, a: Arg[]) {
-  for (const x of a) "s" in x ? w.str(x.s) : w.u32(x.u);
+  for (const x of a) {
+    if ("s" in x) w.str(x.s);
+    else if ("u" in x) w.u32(x.u);
+    else {
+      w.u32(0); // array byte length
+      w.pad(8); // dict entries are 8-aligned, even in an empty array
+    }
+  }
 }
 
 /** Marshal a METHOD_CALL. Exported for tests. */
 export function methodCall(serial: number, dest: string, path: string, iface: string, member: string, a: Arg[] = []): Uint8Array {
   const body = new Writer();
   args(body, a);
-  const signature = a.map((x) => ("s" in x ? "s" : "u")).join("");
+  const signature = a.map((x) => ("s" in x ? "s" : "u" in x ? "u" : "a{sv}")).join("");
   const h = new Writer();
   h.buf.push(0x6c, 1, 0, 1); // 'l', METHOD_CALL, no flags, version 1
   h.u32(body.buf.length);

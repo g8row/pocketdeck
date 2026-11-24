@@ -26,7 +26,7 @@ export const COLORS = ["blue", "violet", "emerald", "amber", "rose", "latte", "z
  *  name is dropped here; the tablet would fall back to the label anyway. */
 export const ICONS: readonly string[] = [
   "mic", "mic-off", "vol-up", "vol-down", "terminal", "spark", "screenshot", "timer", "lock", "display",
-  "cup", "play", "pause", "next", "prev", "link", "grid", "code", "bolt", "dot",
+  "cup", "play", "pause", "next", "prev", "link", "grid", "code", "bolt", "dot", "moon", "bell-off", "crop",
 ];
 export type TileColor = (typeof COLORS)[number];
 
@@ -65,6 +65,8 @@ export interface Tile {
   /** Always filled with the tile colour (else only while "on"). */
   fill?: boolean;
   shape?: "circle";
+  /** "term": drawn terminal-style (square frame, mono text) instead of the rounded tile. */
+  look?: "term";
   action: TileAction;
 }
 
@@ -181,6 +183,7 @@ export function normalizeConfig(raw: unknown): DeckConfig {
       ...(str(t.group, 24).trim() ? { group: str(t.group, 24).trim() } : {}),
       ...(t.fill === true ? { fill: true } : {}),
       ...(t.shape === "circle" ? { shape: "circle" as const } : {}),
+      ...(t.look === "term" ? { look: "term" as const } : {}),
       action,
     });
     if (tiles.length >= 12) break;
